@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var quickAddWindow: QuickAddTaskController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installEditMenu()
         let media = NowPlayingService()
         let audio = AudioService()
         let settings = AppSettings()
@@ -55,6 +56,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SnapshotRenderer.run(model: model, directory: URL(fileURLWithPath: CommandLine.arguments[flag + 1]))
         }
         #endif
+    }
+
+    /// The app has no menu bar of its own, so without this ⌘V, ⌘C, ⌘A and ⌘Z do nothing in text
+    /// fields – pasting the Hub token in settings needs it.
+    private func installEditMenu() {
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        let window = NSMenu(title: "Window")
+        window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+
+        let main = NSMenu()
+        for submenu in [NSMenu(title: "Dynamic Island"), edit, window] {
+            let item = NSMenuItem(title: submenu.title, action: nil, keyEquivalent: "")
+            item.submenu = submenu
+            main.addItem(item)
+        }
+        NSApp.mainMenu = main
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
