@@ -55,6 +55,12 @@ struct IslandRootView: View {
             case .postureCompact:
                 CompactPostureView()
                     .transition(.islandContent(scale: 0.8))
+            case .hubAlert:
+                HubAlertView()
+                    .transition(.islandContent(scale: 0.85))
+            case .hubCompact:
+                CompactHubView()
+                    .transition(.islandContent(scale: 0.8))
             case .open:
                 OpenIslandView(namespace: namespace)
                     .transition(.islandContent(scale: 0.9))

@@ -16,6 +16,9 @@ struct OpenIslandView: View {
                 case .home:
                     HomeTab()
                         .transition(.islandContent(scale: 0.97))
+                case .hub:
+                    HubTab()
+                        .transition(.islandContent(scale: 0.97))
                 case .posture:
                     PostureTab()
                         .transition(.islandContent(scale: 0.97))
@@ -34,6 +37,9 @@ struct OpenIslandView: View {
         HStack(spacing: 0) {
             HStack(spacing: 2) {
                 tabButton(.media, symbol: "music.note", help: "Now Playing")
+                if model.showsHubTab {
+                    tabButton(.hub, symbol: "checklist", help: "Acord Hub", badge: model.hub.unreadCount)
+                }
                 if model.settings.showHomeTab {
                     tabButton(.home, symbol: "house.fill", help: "Home")
                 }
@@ -53,7 +59,7 @@ struct OpenIslandView: View {
         .frame(height: model.notch.height)
     }
 
-    private func tabButton(_ tab: IslandTab, symbol: String, help: String) -> some View {
+    private func tabButton(_ tab: IslandTab, symbol: String, help: String, badge: Int = 0) -> some View {
         let isSelected = model.currentTab == tab
         return Button { model.select(tab) } label: {
             Image(systemName: symbol)
@@ -67,10 +73,19 @@ struct OpenIslandView: View {
                             .matchedGeometryEffect(id: "tab", in: tabNamespace)
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    if badge > 0 {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 7, height: 7)
+                            .offset(x: -6, y: 2)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .help(badge > 0 ? "\(help) – \(badge) unread" : help)
     }
 }
 

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum IslandTab: Hashable {
-    case media, home, controls, posture
+    case media, hub, home, controls, posture
 }
 
 enum HUDKind: Equatable {
@@ -20,6 +20,10 @@ enum IslandPresentation: Equatable {
     case postureAlert
     /// Live activity: the posture figure and the progress towards a reminder.
     case postureCompact
+    /// A notification from Acord Hub.
+    case hubAlert
+    /// Live activity: the next meeting or post, or the overdue pile.
+    case hubCompact
     case open
 }
 
@@ -37,6 +41,7 @@ enum IslandLayout {
     static let maxHomeRows = 3
     static let homeEmptyHeight: CGFloat = 112
     static let postureContentHeight: CGFloat = 150
+    static let hubContentHeight: CGFloat = 214
 }
 
 @MainActor @Observable
@@ -46,6 +51,7 @@ final class IslandModel {
     let brightness: BrightnessService
     let home: HomeService
     let posture: PostureService
+    let hub: AcordHubService
     let settings: AppSettings
 
     var metrics = NotchMetrics.fallback
@@ -57,25 +63,30 @@ final class IslandModel {
     var tab: IslandTab = .media
 
     @ObservationIgnored var onOpenSettings: (() -> Void)?
+    @ObservationIgnored var onQuickAddTask: (() -> Void)?
     @ObservationIgnored private var openTask: Task<Void, Never>?
     @ObservationIgnored private var closeTask: Task<Void, Never>?
     @ObservationIgnored private var hudTask: Task<Void, Never>?
     @ObservationIgnored private var peekTask: Task<Void, Never>?
     @ObservationIgnored private var postureAlertTask: Task<Void, Never>?
+    @ObservationIgnored private var hubAlertTask: Task<Void, Never>?
+    private(set) var isShowingHubAlert = false
     @ObservationIgnored private let keyInterceptor = MediaKeyInterceptor()
     @ObservationIgnored private var permissionPoll: Timer?
 
     init(media: NowPlayingService, audio: AudioService, brightness: BrightnessService, home: HomeService,
-         posture: PostureService, settings: AppSettings) {
+         posture: PostureService, hub: AcordHubService, settings: AppSettings) {
         self.media = media
         self.audio = audio
         self.brightness = brightness
         self.home = home
         self.posture = posture
+        self.hub = hub
         self.settings = settings
 
         media.onTrackChange = { [weak self] in self?.showTrackPeek() }
         posture.onAlert = { [weak self] _ in self?.showPostureAlert() }
+        hub.onAlert = { [weak self] _ in self?.showHubAlert() }
         audio.onExternalVolumeChange = { [weak self] in
             guard let self, self.settings.showVolumeHUD || self.isReplacingSystemHUD else { return }
             self.showHUD(.volume)
@@ -97,9 +108,13 @@ final class IslandModel {
         if isOpen { return .open }
         if let hud { return .hud(hud) }
         if isShowingPostureAlert && posture.latestAlert != nil { return .postureAlert }
+        if isShowingHubAlert && hub.latestAlert != nil { return .hubAlert }
         if isPeeking && media.hasMedia { return .peek }
+        if showsHubTab, hub.settings.livePriorityOverMusic, let kind = hub.liveItem?.kind,
+           kind == .event || kind == .ongoingEvent { return .hubCompact }
         if settings.showLiveActivity && media.hasMedia && media.isPlaying { return .compact }
         if showsPostureCompact { return .postureCompact }
+        if showsHubTab && hub.liveItem != nil { return .hubCompact }
         return .closed
     }
 
@@ -110,6 +125,7 @@ final class IslandModel {
     }
 
     var showsPostureTab: Bool { settings.showPostureTab && posture.isConnected }
+    var showsHubTab: Bool { hub.settings.showTab }
 
     var animation: Animation {
         switch presentation {
@@ -130,8 +146,8 @@ final class IslandModel {
     var earRadius: CGFloat {
         switch presentation {
         case .closed: isHovering ? 6 : 0
-        case .compact, .postureCompact, .hud(.volume), .hud(.brightness): 8
-        case .peek, .postureAlert, .hud(.outputDevice): 10
+        case .compact, .postureCompact, .hubCompact, .hud(.volume), .hud(.brightness): 8
+        case .peek, .postureAlert, .hubAlert, .hud(.outputDevice): 10
         case .open: 14
         }
     }
@@ -139,14 +155,15 @@ final class IslandModel {
     var bottomRadius: CGFloat {
         switch presentation {
         case .closed: isHovering ? 12 : 8
-        case .compact, .postureCompact, .hud(.volume), .hud(.brightness): 13
+        case .compact, .postureCompact, .hubCompact, .hud(.volume), .hud(.brightness): 13
         case .peek, .hud(.outputDevice): 22
-        case .postureAlert: 24
+        case .postureAlert, .hubAlert: 24
         case .open: 32
         }
     }
 
-    var openWidth: CGFloat { max(notch.width + 340, 500) }
+    /// A little wider with the Hub tab, so five tabs fit beside the notch and rows have room.
+    var openWidth: CGFloat { showsHubTab ? max(notch.width + 400, 560) : max(notch.width + 340, 500) }
 
     var size: CGSize {
         let ears = earRadius * 2
@@ -158,6 +175,10 @@ final class IslandModel {
             return CGSize(width: notch.width + compactSideWidth * 2 + ears, height: notch.height)
         case .postureAlert:
             return CGSize(width: notch.width + 260 + ears, height: notch.height + 64)
+        case .hubAlert:
+            return CGSize(width: notch.width + 300 + ears, height: notch.height + 64)
+        case .hubCompact:
+            return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .hud(.volume), .hud(.brightness):
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .peek:
@@ -173,6 +194,7 @@ final class IslandModel {
     var currentTab: IslandTab {
         switch tab {
         case .home where !settings.showHomeTab: .media
+        case .hub where !showsHubTab: .media
         case .posture where !showsPostureTab: .media
         default: tab
         }
@@ -189,6 +211,8 @@ final class IslandModel {
             return 4 + rows * IslandLayout.homeTileHeight + (rows - 1) * IslandLayout.homeTileSpacing + 18
         case .posture:
             return IslandLayout.postureContentHeight
+        case .hub:
+            return IslandLayout.hubContentHeight
         case .controls:
             let sliders: CGFloat = brightness.isAvailable ? 2 : 1
             let rows = CGFloat(min(audio.devices.count, IslandLayout.maxVisibleDevices))
@@ -245,10 +269,24 @@ final class IslandModel {
         hudTask?.cancel()
         peekTask?.cancel()
         postureAlertTask?.cancel()
+        hubAlertTask?.cancel()
         hud = nil
         isPeeking = false
         isShowingPostureAlert = false
+        // An alert that was showing opens the island on the item it was about.
+        if isShowingHubAlert, let alert = hub.latestAlert, showsHubTab {
+            tab = .hub
+            if let section = alert.section.flatMap(HubSection.init(rawValue:)) { hub.section = section }
+        } else {
+            switch hub.settings.startTab {
+            case .media: tab = .media
+            case .hub where showsHubTab: tab = .hub
+            default: break
+            }
+        }
+        isShowingHubAlert = false
         if currentTab == .home { home.refresh() }
+        if currentTab == .hub { hub.refresh() }
         isOpen = true
     }
 
@@ -266,6 +304,7 @@ final class IslandModel {
 
     func select(_ tab: IslandTab) {
         if tab == .home { home.refresh() }
+        if tab == .hub { hub.refresh() }
         guard tab != self.tab else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { self.tab = tab }
     }
@@ -294,6 +333,20 @@ final class IslandModel {
         performHaptic(.generic)
         postureAlertTask?.cancel()
         postureAlertTask = schedule(after: 6) { $0.isShowingPostureAlert = false }
+    }
+
+    func showHubAlert() {
+        guard !isOpen, showsHubTab else { return }
+        isPeeking = false
+        isShowingHubAlert = true
+        performHaptic(.generic)
+        hubAlertTask?.cancel()
+        hubAlertTask = schedule(after: max(hub.settings.alertSeconds, 2)) { $0.isShowingHubAlert = false }
+    }
+
+    func dismissHubAlert() {
+        hubAlertTask?.cancel()
+        isShowingHubAlert = false
     }
 
     // MARK: Keyboard

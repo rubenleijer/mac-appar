@@ -7,11 +7,37 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var hasAccessibility = MediaKeyInterceptor.hasPermission
 
+    @State private var page = Page.general
+
+    private enum Page: Hashable { case general, hub }
+
     private let permissionTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $page) {
+                Text("General").tag(Page.general)
+                Text("Acord Hub").tag(Page.hub)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 260)
+            .padding(.top, 14)
+            .padding(.bottom, 2)
+
+            switch page {
+            case .general:
+                generalForm
+            case .hub:
+                HubSettingsView()
+                    .frame(width: 460, height: 620)
+            }
+        }
+    }
+
+    private var generalForm: some View {
         @Bindable var settings = model.settings
-        Form {
+        return Form {
             Section {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }

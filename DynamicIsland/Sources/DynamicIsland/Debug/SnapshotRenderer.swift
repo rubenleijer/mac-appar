@@ -46,6 +46,20 @@ enum SnapshotRenderer {
                                             progress: 0, score: 91, todayGood: 0.86, headPitch: 2, airpods: true,
                                             interval: 10, lastCheck: Date(), pausedUntil: nil))
             render("14-open-posture-good", model, directory)
+            model.close()
+            model.hub.showPreview()
+            render("15-hub-compact", model, directory)
+            model.hub.showPreviewAlert()
+            model.showHubAlert()
+            try? await Task.sleep(for: .seconds(0.5))
+            render("16-hub-alert", model, directory)
+            model.dismissHubAlert()
+            model.open()
+            model.select(.hub)
+            model.hub.section = .tasks
+            render("17-open-hub-tasks", model, directory)
+            model.hub.section = .calendar
+            render("18-open-hub-calendar", model, directory)
             model.select(.media)
             model.close()
             NSApp.terminate(nil)

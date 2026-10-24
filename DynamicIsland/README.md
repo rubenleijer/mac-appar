@@ -27,6 +27,7 @@
 - **Sound and display.** Volume, mute, brightness and a one-click audio output switcher for speakers, AirPods and AirPlay, like Control Center.
 - **HUDs in the notch.** Volume, brightness and output changes appear in the island. It can also replace the system's volume and brightness overlay.
 - **Apple Home.** Tap tiles to run your Home scenes and accessories through Shortcuts.
+- **Acord Hub.** Tasks, meetings, approvals and scheduled posts from Acord Hub in their own tab, alerts in the notch when something needs you, a countdown to your next meeting, and a quick way to add tasks.
 - **Posture companion.** With the [Posture](../Hallning) app running, the island shows your posture and nudges you when you slouch.
 - **Feels like a Mac.** Spring animations, blur-and-scale transitions, rubber-band sliders, SF Symbols and trackpad haptics. It never steals focus from the app you're using.
 
@@ -77,6 +78,19 @@ Native Mac apps can't use HomeKit. It's only available to Mac Catalyst apps with
 
 <img src="Screenshots/home-setup.png" width="480" alt="Home tab before any shortcuts exist">
 
+### Acord Hub
+
+The Hub tab reads Acord Hub through its MCP server, the same tools Claude uses, so the Hub needs no extra API.
+
+1. Open **Settings → Acord Hub** and enter the MCP server address (for example `https://hub.acordmedia.com/api/mcp`) and your token. The token is stored in the keychain.
+2. Click **Test Connection**, then choose yourself under **You are** so the island knows which tasks are yours.
+3. The tab shows **Tasks**, **Calendar**, **Approvals**, **Content** and **Notifications**. Turn sections on or off, reorder them, and filter tasks by assignee, status, priority and due date.
+4. Click **+** to add a task (title, due date, project, assignee). Click a row or **↗** to open the Hub in the browser; set the paths under **Advanced**.
+
+**Notifications.** The Hub has no notification feed, so the island compares each refresh with the last: new tasks for you, tasks due or overdue, meetings and posts about to start, and approvals that are requested or answered. Each item notifies once. Alerts drop out of the notch; you can add a sound, keep them to work hours or turn on Do Not Disturb.
+
+**Live activity.** While the island is closed it can show the next meeting or post with a countdown, the time left of a meeting in progress, or the number of overdue tasks. Meetings can take priority over music.
+
 ### Replacing the system volume HUD
 
 Turn on **Replace the system volume and brightness HUD** in settings and grant **Accessibility** access when asked. The volume and brightness keys then show only in the island. Hold <kbd>⌥</kbd><kbd>⇧</kbd> for quarter steps, like on macOS.
@@ -90,10 +104,11 @@ Turn on **Replace the system volume and brightness HUD** in settings and grant *
 | Permission | Used for | Required |
 |---|---|:---:|
 | Accessibility | Replacing the system volume and brightness HUD | Optional |
+| Keychain | Storing the Acord Hub token | Only with Acord Hub |
 
 Everything else, like Now Playing, volume, outputs and brightness, works without any prompts. Shortcuts may ask for access to Home the first time a Home shortcut runs.
 
-The app has no network code, analytics or accounts. Everything stays on your Mac.
+The only network traffic is to the Acord Hub server you configure, and only once you've added a token. There are no analytics. Everything else stays on your Mac.
 
 ## How it works
 
@@ -149,7 +164,7 @@ DynamicIsland/
 └── Sources/DynamicIsland/
     ├── App/                    # Entry point and app delegate
     ├── Island/                 # Window, notch geometry, state model
-    ├── Services/               # Now Playing, audio, brightness, keys, Home, Posture
+    ├── Services/               # Now Playing, audio, brightness, keys, Home, Posture, Acord Hub
     ├── Settings/               # Preferences and settings window
     ├── Views/                  # Island shape, live activities, tabs, components
     └── Debug/                  # Snapshot renderer (debug builds only)
