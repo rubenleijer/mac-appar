@@ -3,77 +3,166 @@ import SwiftUI
 
 // MARK: - Row
 
-/// A task in the list: tick the circle to finish it, click the text to open it, hover for the timer.
+/// A task as a card, styled like the task cards in Acord Hub: a border and soft tint in the
+/// priority's color, a check circle, the title, the day and client, and the assignees' initials.
 struct HubTaskRow: View {
     let task: HubTask
     @Environment(IslandModel.self) private var model
     @State private var isHovering = false
+    @State private var isCompleting = false
 
     var body: some View {
         let hub = model.hub
+        let style = TaskCardStyle(task: task, now: hub.now, isDone: isCompleting)
         let isTiming = hub.timer?.taskID == task.id
-        HStack(spacing: 10) {
-            TaskCheckButton(task: task, isBusy: hub.busyIDs.contains(task.id)) { hub.complete(task) }
-                .frame(width: 26)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(task.title)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                let due = taskDueText(task, now: hub.now)
-                let parts = [due.text, hub.clientName(for: task),
-                             hub.settings.taskScope == .mine ? nil : hub.memberName(task.assigneeID),
-                             task.status == HubTaskStatus.inProgress.rawValue ? "In progress" : nil]
-                let subtitle = parts.compactMap { $0 }.joined(separator: " · ")
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(due.color)
-                        .lineLimit(1)
+        HStack(spacing: 10) {
+            TaskCheckCircle(isDone: isCompleting, isBusy: hub.busyIDs.contains(task.id) && !isCompleting) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleting = true }
+                // Let the tick show before the card goes.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(380))
+                    hub.complete(task)
+                    isCompleting = false
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(style.title)
+                    .strikethrough(isCompleting, color: style.title.opacity(0.6))
+                    .lineLimit(1)
+                subtitle(style: style)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { hub.select(task) }
 
-            if isTiming {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(clockText(hub.timeTracked(on: task.id, now: context.date)))
-                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.green)
+            HStack(spacing: 4) {
+                if isTiming {
+                    TimerChip(taskID: task.id) { hub.toggleTimer(task) }
+                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                } else if isHovering {
+                    Button { hub.toggleTimer(task) } label: {
+                        Image(systemName: "play.fill").font(.system(size: 10, weight: .bold))
+                    }
+                    .buttonStyle(IslandButtonStyle(diameter: 24))
+                    .help("Start a timer")
+                    .transition(.opacity)
                 }
-            }
-            if isHovering || isTiming {
-                Button { hub.toggleTimer(task) } label: {
-                    Image(systemName: isTiming ? "stop.fill" : "play.fill").font(.system(size: 10, weight: .bold))
+                if isHovering {
+                    Button { hub.delete(task) } label: {
+                        Image(systemName: "trash").font(.system(size: 10.5, weight: .semibold))
+                    }
+                    .buttonStyle(IslandButtonStyle(diameter: 24))
+                    .help("Delete")
+                    .transition(.opacity)
                 }
-                .buttonStyle(IslandButtonStyle(diameter: 22))
-                .help(isTiming ? "Stop the timer" : "Start a timer")
-                .transition(.opacity)
-            }
-            if isHovering {
-                Button { hub.select(task) } label: {
-                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(IslandButtonStyle(diameter: 22))
-                .help("Open")
-                .transition(.opacity)
+                AvatarStack(names: assigneeNames)
             }
         }
-        .padding(.horizontal, 6)
-        .frame(height: 38)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(.white.opacity(isHovering ? 0.08 : 0)))
+        .padding(.leading, 10)
+        .padding(.trailing, 8)
+        .frame(height: 50)
+        .background {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(LinearGradient(colors: [style.tint.opacity(isHovering ? 0.2 : 0.15), style.tint.opacity(0.05)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color(white: 0.09)))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .strokeBorder(style.tint.opacity(isHovering ? 0.95 : 0.7), lineWidth: 1.5)
+        }
+        .shadow(color: style.tint.opacity(isHovering ? 0.25 : 0), radius: 8, y: 2)
+        .scaleEffect(isCompleting ? 0.98 : 1)
+        .opacity(isCompleting ? 0.75 : 1)
+        .padding(.vertical, 3)
         .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: isHovering)
+        .animation(.easeOut(duration: 0.15), value: isHovering)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isTiming)
         .contextMenu { TaskMenuItems(task: task) }
         .help(task.title)
     }
+
+    private func subtitle(style: TaskCardStyle) -> some View {
+        let hub = model.hub
+        var parts: [String] = []
+        if let client = hub.clientName(for: task) { parts.append(client) }
+        if let minutes = task.estimateMinutes { parts.append(estimateText(minutes)) }
+        if task.status == HubTaskStatus.inProgress.rawValue { parts.append("In progress") }
+        return HStack(spacing: 6) {
+            if let day = style.dayText {
+                Text(day)
+                    .foregroundStyle(style.dayColor)
+                    .fontWeight(style.isLate ? .semibold : .regular)
+            }
+            if !parts.isEmpty {
+                Text(parts.joined(separator: " – "))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+        }
+        .font(.system(size: 11))
+        .lineLimit(1)
+    }
+
+    private var assigneeNames: [String] {
+        let hub = model.hub
+        let ids = task.allAssigneeIDs
+        if !ids.isEmpty { return ids.compactMap { id in hub.team.first { $0.id == id }?.name } }
+        if hub.detail?.task.id == task.id { return hub.detail?.assigneeNames ?? [] }
+        return []
+    }
 }
 
-/// The circle that finishes a task. Its color is the priority; it fills while the task is in progress.
-private struct TaskCheckButton: View {
-    let task: HubTask
+/// Colors for a task card. Matches the Hub: critical is purple, high red, medium orange,
+/// the rest neutral, and a finished task green.
+struct TaskCardStyle {
+    let tint: Color
+    let title: Color
+    let dayText: String?
+    let dayColor: Color
+    let isLate: Bool
+
+    init(task: HubTask, now: Date, isDone: Bool = false) {
+        let color: Color = if isDone { .green } else { task.priority.cardColor }
+        tint = color
+        title = task.priority == .none || task.priority == .low ? .white : color.blended(towardsWhite: 0.55)
+        let days = task.daysLeft(now: now)
+        isLate = (days ?? 0) < 0
+        if let due = task.dueDay {
+            dayText = due.formatted(.dateTime.day().month(.abbreviated))
+        } else {
+            dayText = nil
+        }
+        dayColor = isLate ? Color(red: 1, green: 0.45, blue: 0.42) : (days == 0 ? .white.opacity(0.8) : .white.opacity(0.55))
+    }
+}
+
+extension HubPriority {
+    /// The card border color, as in Acord Hub.
+    var cardColor: Color {
+        switch self {
+        case .dangerous: Color(red: 0.55, green: 0.38, blue: 1)
+        case .high: Color(red: 1, green: 0.38, blue: 0.38)
+        case .medium: Color(red: 1, green: 0.6, blue: 0.25)
+        case .low, .none: Color(white: 0.6)
+        }
+    }
+}
+
+extension Color {
+    /// The color moved `fraction` of the way to white (`Color.mix` needs macOS 15).
+    func blended(towardsWhite fraction: CGFloat) -> Color {
+        let base = NSColor(self).usingColorSpace(.sRGB) ?? NSColor(self)
+        return Color(nsColor: base.blended(withFraction: fraction, of: .white) ?? base)
+    }
+}
+
+/// The round check on the left of a card.
+private struct TaskCheckCircle: View {
+    let isDone: Bool
     let isBusy: Bool
     let action: () -> Void
     @State private var isHovering = false
@@ -84,24 +173,92 @@ private struct TaskCheckButton: View {
                 if isBusy {
                     ProgressView().controlSize(.mini)
                 } else {
-                    PriorityBadge(priority: task.priority, inProgress: task.status == HubTaskStatus.inProgress.rawValue)
-                        .opacity(isHovering ? 0 : 1)
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.white, .green)
-                        .opacity(isHovering ? 1 : 0)
-                        .scaleEffect(isHovering ? 1 : 0.6)
+                    Circle()
+                        .strokeBorder(.white.opacity(isHovering ? 0.75 : 0.35), lineWidth: 1.5)
+                        .background(Circle().fill(isDone ? Color.green : Color.white.opacity(isHovering ? 0.08 : 0)))
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(isDone ? Color.white : Color.white.opacity(0.7))
+                        .opacity(isDone || isHovering ? 1 : 0)
+                        .scaleEffect(isDone ? 1 : 0.8)
                 }
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 22, height: 22)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .disabled(isBusy)
+        .disabled(isBusy || isDone)
         .onHover { isHovering = $0 }
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDone)
         .help("Mark as done")
     }
+}
+
+/// Overlapping initials, like the avatars on the Hub's cards.
+private struct AvatarStack: View {
+    let names: [String]
+
+    var body: some View {
+        HStack(spacing: -8) {
+            ForEach(Array(names.prefix(3).enumerated()), id: \.offset) { index, name in
+                Text(initials(name))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(color(for: name)))
+                    .overlay(Circle().strokeBorder(Color(white: 0.09), lineWidth: 2))
+                    .zIndex(Double(-index))
+            }
+        }
+        .help(names.joined(separator: ", "))
+    }
+
+    private func initials(_ name: String) -> String {
+        let parts = name.split(separator: " ")
+        return parts.prefix(2).compactMap { $0.first }.map(String.init).joined().uppercased()
+    }
+
+    private func color(for name: String) -> Color {
+        let palette: [Color] = [Color(red: 0.36, green: 0.4, blue: 0.48), Color(red: 0.52, green: 0.38, blue: 0.32),
+                                Color(red: 0.35, green: 0.36, blue: 0.4), Color(red: 0.3, green: 0.45, blue: 0.42)]
+        let sum = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        return palette[sum % palette.count]
+    }
+}
+
+/// The running timer on a card: "▶ 4:05", click to stop.
+private struct TimerChip: View {
+    let taskID: String
+    let action: () -> Void
+    @Environment(IslandModel.self) private var model
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: isHovering ? "stop.fill" : "play.fill").font(.system(size: 9, weight: .bold))
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(clockText(model.hub.timeTracked(on: taskID, now: context.date)))
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(Capsule().fill(Color.white.opacity(isHovering ? 0.2 : 0.13)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("Stop the timer")
+    }
+}
+
+private func estimateText(_ minutes: Int) -> String {
+    if minutes < 60 { return "\(minutes) min" }
+    let hours = Double(minutes) / 60
+    return hours == hours.rounded() ? "\(Int(hours)) h" : String(format: "%.1f h", hours)
 }
 
 /// Every task action, for context menus and the ⋯ button.
@@ -220,7 +377,7 @@ struct HubTaskDetailView: View {
         let due = taskDueText(task, now: hub.now)
         return HStack(spacing: 6) {
             Chip(title: task.priority == .none ? "No priority" : task.priority.title, symbol: "flag.fill",
-                 tint: task.priority.color) {
+                 tint: task.priority.cardColor) {
                 let entries: [IslandMenu.Entry] = HubPriority.allCases.reversed().map { priority in
                     IslandMenu.Entry.item(priority == .none ? "No priority" : priority.title,
                                           checked: priority == task.priority,

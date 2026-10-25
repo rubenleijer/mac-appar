@@ -13,6 +13,17 @@ struct HubTask: Identifiable, Equatable {
     let assigneeID: String?
     let clientID: String?
     let projectID: String?
+    /// Everyone on the task, when the Hub lists more than one assignee.
+    var assigneeIDs: [String] = []
+    /// The Hub's time estimate, in minutes.
+    var estimateMinutes: Int?
+
+    /// All assignees, the main one first.
+    var allAssigneeIDs: [String] {
+        var ids = assigneeID.map { [$0] } ?? []
+        for id in assigneeIDs where !ids.contains(id) { ids.append(id) }
+        return ids
+    }
 
     func isOverdue(now: Date) -> Bool {
         guard let dueDay else { return false }
@@ -251,7 +262,42 @@ extension HubTask {
                   dueDay: json.date("due_date", "dueDate", "due").map { Calendar.current.startOfDay(for: $0.date) },
                   assigneeID: json.string("assignee_id", "assigneeId", "assignee"),
                   clientID: json.string("client_id", "clientId"),
-                  projectID: json.string("project_id", "projectId"))
+                  projectID: json.string("project_id", "projectId"),
+                  assigneeIDs: Self.assigneeIDs(json),
+                  estimateMinutes: Self.estimate(json))
+    }
+
+    private static func assigneeIDs(_ json: HubJSON) -> [String] {
+        for key in ["assignee_ids", "assigneeIds", "assignees"] {
+            if let ids = json.raw[key] as? [String] { return ids }
+            if let people = json.raw[key] as? [[String: Any]] {
+                return people.compactMap { HubJSON(raw: $0).string("id", "user_id", "userId") }
+            }
+        }
+        return []
+    }
+
+    /// Minutes from whichever estimate field the Hub sends.
+    private static func estimate(_ json: HubJSON) -> Int? {
+        for key in ["estimate_minutes", "estimated_minutes", "time_estimate_minutes", "duration_minutes", "estimate", "time_estimate", "estimated_time", "duration"] {
+            if let number = json.raw[key] as? NSNumber { return number.intValue > 0 ? number.intValue : nil }
+            if let text = json.raw[key] as? String, let minutes = parseDuration(text) { return minutes }
+        }
+        return nil
+    }
+
+    /// "30 min", "2 h", "1h 30m", "1,5 tim", "45".
+    private static func parseDuration(_ text: String) -> Int? {
+        let lower = text.lowercased().replacingOccurrences(of: ",", with: ".")
+        if let minutes = Int(lower.trimmingCharacters(in: .whitespaces)) { return minutes > 0 ? minutes : nil }
+        guard let regex = try? NSRegularExpression(pattern: #"(\d+(?:\.\d+)?)\s*(h|t|m)?"#) else { return nil }
+        var total = 0.0
+        for match in regex.matches(in: lower, range: NSRange(lower.startIndex..., in: lower)) {
+            guard let valueRange = Range(match.range(at: 1), in: lower), let value = Double(lower[valueRange]) else { continue }
+            let unit = Range(match.range(at: 2), in: lower).map { String(lower[$0]) } ?? "m"
+            total += unit == "m" ? value : value * 60
+        }
+        return total > 0 ? Int(total.rounded()) : nil
     }
 }
 

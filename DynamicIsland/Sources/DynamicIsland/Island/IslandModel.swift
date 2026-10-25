@@ -41,7 +41,7 @@ enum IslandLayout {
     static let maxHomeRows = 3
     static let homeEmptyHeight: CGFloat = 112
     static let postureContentHeight: CGFloat = 150
-    static let hubContentHeight: CGFloat = 214
+    static let hubContentHeight: CGFloat = 250
     static let trayContentHeight: CGFloat = 148
 }
 
