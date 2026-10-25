@@ -85,60 +85,57 @@ private struct Sparkline: View {
     }
 }
 
-/// Beside the notch. With the clock: the time right against the camera on the left – as near
-/// the middle as there are pixels – and temperature and battery together on the right. Without
-/// it: temperature left, battery right.
+/// A slim pill just below the camera: temperature on the left, the time in the middle and the
+/// battery on the right, all on one line. (The middle of the notch itself has no pixels.)
 struct CompactThermalView: View {
     @Environment(IslandModel.self) private var model
 
     var body: some View {
-        let thermal = model.thermal
-        let showsClock = model.settings.showClockInNotch
-        let side = model.thermalSideWidth
-        HStack(spacing: 0) {
-            // Left of the camera
-            HStack(spacing: 0) {
-                if showsClock {
-                    Spacer(minLength: 0)
-                    NotchClock()
-                } else {
-                    temperature
-                    Spacer(minLength: 0)
-                }
-            }
-            .padding(.leading, showsClock ? 0 : 12)
-            .padding(.trailing, showsClock ? 8 : 0)
-            .frame(width: side)
-
-            // The camera
-            Color.clear.frame(width: model.notch.width)
-
-            // Right of the camera
-            HStack(spacing: 7) {
-                if showsClock { temperature }
-                if !showsClock { Spacer(minLength: 0) }
-                if let battery = thermal.battery { batteryLabel(battery) }
-                if showsClock { Spacer(minLength: 0) }
-            }
-            .padding(.leading, showsClock ? 8 : 0)
-            .padding(.trailing, showsClock ? 0 : 12)
-            .frame(width: side)
+        VStack(spacing: 0) {
+            Color.clear.frame(height: model.notch.height)
+            ThermalStrip()
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, model.earRadius)
-        .frame(height: model.notch.height)
+    }
+}
+
+/// Temperature, time and battery on one line. Also hangs under music and other live activities.
+struct ThermalStrip: View {
+    @Environment(IslandModel.self) private var model
+
+    var body: some View {
+        let thermal = model.thermal
+        VStack(spacing: 0) {
+            ZStack {
+                if model.settings.showClockInNotch {
+                    NotchClock()
+                }
+                HStack(spacing: 0) {
+                    temperature
+                    Spacer(minLength: 8)
+                    if let battery = thermal.battery { batteryLabel(battery) }
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: IslandLayout.thermalStripHeight - 4)
+        }
         .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
         .animation(.easeInOut(duration: 0.4), value: thermal.battery)
     }
 
     private var temperature: some View {
         let thermal = model.thermal
-        return Text(thermal.cpuText)
-            .font(.system(size: 12, weight: .semibold).monospacedDigit())
-            .foregroundStyle(ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold))
-            .contentTransition(.numericText())
-            .lineLimit(1)
-            .fixedSize()
-            .help("CPU temperature")
+        return HStack(spacing: 3) {
+            Image(systemName: "thermometer.medium").font(.system(size: 11, weight: .semibold))
+            Text(thermal.cpuText)
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .contentTransition(.numericText())
+        }
+        .foregroundStyle(ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold))
+        .lineLimit(1)
+        .fixedSize()
+        .help("CPU temperature")
     }
 
     private func batteryLabel(_ battery: ThermalService.Battery) -> some View {
