@@ -59,6 +59,31 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show temperature in Sound and display", isOn: $settings.showTemperature)
+                Toggle("Show the temperature beside the notch", isOn: $settings.showTemperatureLiveActivity)
+                HStack {
+                    Toggle("Warn when the Mac runs hot", isOn: $settings.warnWhenHot)
+                    Spacer()
+                    Picker("", selection: $settings.hotThreshold) {
+                        ForEach([75, 80, 85, 90, 95, 100], id: \.self) { Text("at \($0)°C").tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(!settings.warnWhenHot)
+                }
+                HStack {
+                    Text(model.thermal.isAvailable ? "CPU now: \(model.thermal.cpuText) · \(model.thermal.thermalTitle)" : "No temperature sensors found")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+            } header: {
+                Text("Temperature")
+            } footer: {
+                Text("Read from the chip’s own sensors every few seconds. The notch shows it only when nothing else is there.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Show Tray tab", isOn: $settings.showTrayTab)
                 Toggle("Open the tray when dragging files to the notch", isOn: $settings.openTrayOnDrag)
                     .disabled(!settings.showTrayTab)

@@ -14,6 +14,10 @@ final class AppSettings {
     var showPostureLiveActivity: Bool { didSet { store(showPostureLiveActivity, Key.showPostureLiveActivity) } }
     var homeFolderName: String { didSet { defaults.set(homeFolderName, forKey: Key.homeFolderName) } }
     var showTrayTab: Bool { didSet { store(showTrayTab, Key.showTrayTab) } }
+    var showTemperature: Bool { didSet { store(showTemperature, Key.showTemperature) } }
+    var showTemperatureLiveActivity: Bool { didSet { store(showTemperatureLiveActivity, Key.showTemperatureLiveActivity) } }
+    var warnWhenHot: Bool { didSet { store(warnWhenHot, Key.warnWhenHot) } }
+    var hotThreshold: Int { didSet { defaults.set(hotThreshold, forKey: Key.hotThreshold) } }
     var autoUpdate: Bool { didSet { store(autoUpdate, Key.autoUpdate) } }
     var autoInstallUpdates: Bool { didSet { store(autoInstallUpdates, Key.autoInstallUpdates) } }
     var updateRepository: String { didSet { defaults.set(updateRepository, forKey: Key.updateRepository) } }
@@ -44,6 +48,10 @@ final class AppSettings {
         static let showPostureAlerts = "showPostureAlerts"
         static let showPostureLiveActivity = "showPostureLiveActivity"
         static let showTrayTab = "showTrayTab"
+        static let showTemperature = "showTemperature"
+        static let showTemperatureLiveActivity = "showTemperatureLiveActivity"
+        static let warnWhenHot = "warnWhenHot"
+        static let hotThreshold = "hotThreshold"
         static let autoUpdate = "autoUpdate"
         static let autoInstallUpdates = "autoInstallUpdates"
         static let updateRepository = "updateRepository"
@@ -65,6 +73,10 @@ final class AppSettings {
             Key.replaceSystemHUD: false,
             Key.showHomeTab: false,
             Key.showTrayTab: true,
+            Key.showTemperature: true,
+            Key.showTemperatureLiveActivity: false,
+            Key.warnWhenHot: true,
+            Key.hotThreshold: 90,
             Key.autoUpdate: true,
             Key.autoInstallUpdates: true,
             Key.updateRepository: "rubenleijer/mac-appar",
@@ -89,6 +101,10 @@ final class AppSettings {
         showPostureLiveActivity = defaults.bool(forKey: Key.showPostureLiveActivity)
         homeFolderName = defaults.string(forKey: Key.homeFolderName) ?? "Home"
         showTrayTab = defaults.bool(forKey: Key.showTrayTab)
+        showTemperature = defaults.bool(forKey: Key.showTemperature)
+        showTemperatureLiveActivity = defaults.bool(forKey: Key.showTemperatureLiveActivity)
+        warnWhenHot = defaults.bool(forKey: Key.warnWhenHot)
+        hotThreshold = max(defaults.integer(forKey: Key.hotThreshold), 60)
         autoUpdate = defaults.bool(forKey: Key.autoUpdate)
         autoInstallUpdates = defaults.bool(forKey: Key.autoInstallUpdates)
         updateRepository = defaults.string(forKey: Key.updateRepository) ?? "rubenleijer/mac-appar"

@@ -61,6 +61,12 @@ struct IslandRootView: View {
             case .hubCompact:
                 CompactHubView()
                     .transition(.islandContent(scale: 0.8))
+            case .thermalAlert:
+                ThermalAlertView()
+                    .transition(.islandContent(scale: 0.85))
+            case .thermalCompact:
+                CompactThermalView()
+                    .transition(.islandContent(scale: 0.8))
             case .open:
                 OpenIslandView(namespace: namespace)
                     .transition(.islandContent(scale: 0.9))

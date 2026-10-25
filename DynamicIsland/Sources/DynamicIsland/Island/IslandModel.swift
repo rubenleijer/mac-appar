@@ -24,6 +24,10 @@ enum IslandPresentation: Equatable {
     case hubAlert
     /// Live activity: the next meeting or post, or the overdue pile.
     case hubCompact
+    /// The Mac is running hot.
+    case thermalAlert
+    /// Live activity: the chip temperature beside the notch.
+    case thermalCompact
     case open
 }
 
@@ -47,6 +51,7 @@ enum IslandLayout {
     static let maxHubCards = 4
     static let maxHubRows = 5
     static let trayContentHeight: CGFloat = 148
+    static let temperatureRowHeight: CGFloat = 40
 }
 
 @MainActor @Observable
@@ -58,6 +63,7 @@ final class IslandModel {
     let posture: PostureService
     let hub: AcordHubService
     let tray: TrayService
+    let thermal: ThermalService
     let settings: AppSettings
 
     var metrics = NotchMetrics.fallback
@@ -79,12 +85,15 @@ final class IslandModel {
     @ObservationIgnored private var peekTask: Task<Void, Never>?
     @ObservationIgnored private var postureAlertTask: Task<Void, Never>?
     @ObservationIgnored private var hubAlertTask: Task<Void, Never>?
+    @ObservationIgnored private var thermalAlertTask: Task<Void, Never>?
+    private(set) var isShowingThermalAlert = false
     private(set) var isShowingHubAlert = false
     @ObservationIgnored private let keyInterceptor = MediaKeyInterceptor()
     @ObservationIgnored private var permissionPoll: Timer?
 
     init(media: NowPlayingService, audio: AudioService, brightness: BrightnessService, home: HomeService,
-         posture: PostureService, hub: AcordHubService, tray: TrayService, settings: AppSettings) {
+         posture: PostureService, hub: AcordHubService, tray: TrayService, thermal: ThermalService,
+         settings: AppSettings) {
         self.media = media
         self.audio = audio
         self.brightness = brightness
@@ -92,11 +101,13 @@ final class IslandModel {
         self.posture = posture
         self.hub = hub
         self.tray = tray
+        self.thermal = thermal
         self.settings = settings
 
         media.onTrackChange = { [weak self] in self?.showTrackPeek() }
         posture.onAlert = { [weak self] _ in self?.showPostureAlert() }
         hub.onAlert = { [weak self] _ in self?.showHubAlert() }
+        thermal.onHot = { [weak self] in self?.showThermalAlert() }
         audio.onExternalVolumeChange = { [weak self] in
             guard let self, self.settings.showVolumeHUD || self.isReplacingSystemHUD else { return }
             self.showHUD(.volume)
@@ -119,12 +130,14 @@ final class IslandModel {
         if let hud { return .hud(hud) }
         if isShowingPostureAlert && posture.latestAlert != nil { return .postureAlert }
         if isShowingHubAlert && hub.latestAlert != nil { return .hubAlert }
+        if isShowingThermalAlert { return .thermalAlert }
         if isPeeking && media.hasMedia { return .peek }
         if showsHubTab, hub.settings.livePriorityOverMusic, let kind = hub.liveItem?.kind,
            kind == .event || kind == .ongoingEvent || kind == .timer { return .hubCompact }
         if settings.showLiveActivity && media.hasMedia && media.isPlaying { return .compact }
         if showsPostureCompact { return .postureCompact }
         if showsHubTab && hub.liveItem != nil { return .hubCompact }
+        if settings.showTemperatureLiveActivity && thermal.isAvailable { return .thermalCompact }
         return .closed
     }
 
@@ -156,8 +169,8 @@ final class IslandModel {
     var earRadius: CGFloat {
         switch presentation {
         case .closed: isHovering ? 6 : 0
-        case .compact, .postureCompact, .hubCompact, .hud(.volume), .hud(.brightness): 8
-        case .peek, .postureAlert, .hubAlert, .hud(.outputDevice): 10
+        case .compact, .postureCompact, .hubCompact, .thermalCompact, .hud(.volume), .hud(.brightness): 8
+        case .peek, .postureAlert, .hubAlert, .thermalAlert, .hud(.outputDevice): 10
         case .open: 14
         }
     }
@@ -165,9 +178,9 @@ final class IslandModel {
     var bottomRadius: CGFloat {
         switch presentation {
         case .closed: isHovering ? 12 : 8
-        case .compact, .postureCompact, .hubCompact, .hud(.volume), .hud(.brightness): 13
+        case .compact, .postureCompact, .hubCompact, .thermalCompact, .hud(.volume), .hud(.brightness): 13
         case .peek, .hud(.outputDevice): 22
-        case .postureAlert, .hubAlert: 24
+        case .postureAlert, .hubAlert, .thermalAlert: 24
         case .open: 32
         }
     }
@@ -189,6 +202,10 @@ final class IslandModel {
             return CGSize(width: notch.width + 300 + ears, height: notch.height + 64)
         case .hubCompact:
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
+        case .thermalCompact:
+            return CGSize(width: notch.width + compactSideWidth * 2 + 16 + ears, height: notch.height)
+        case .thermalAlert:
+            return CGSize(width: notch.width + 260 + ears, height: notch.height + 64)
         case .hud(.volume), .hud(.brightness):
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .peek:
@@ -229,7 +246,8 @@ final class IslandModel {
         case .controls:
             let sliders: CGFloat = brightness.isAvailable ? 2 : 1
             let rows = CGFloat(min(audio.devices.count, IslandLayout.maxVisibleDevices))
-            return 4 + sliders * IslandLayout.sliderRowHeight + 8 + IslandLayout.sectionHeaderHeight
+            let temperature: CGFloat = settings.showTemperature && thermal.isAvailable ? IslandLayout.temperatureRowHeight + 8 : 0
+            return 4 + temperature + sliders * IslandLayout.sliderRowHeight + 8 + IslandLayout.sectionHeaderHeight
                 + rows * IslandLayout.deviceRowHeight + 16
         }
     }
@@ -305,6 +323,8 @@ final class IslandModel {
         peekTask?.cancel()
         postureAlertTask?.cancel()
         hubAlertTask?.cancel()
+        thermalAlertTask?.cancel()
+        isShowingThermalAlert = false
         hud = nil
         isPeeking = false
         isShowingPostureAlert = false
@@ -397,6 +417,15 @@ final class IslandModel {
         performHaptic(.generic)
         hubAlertTask?.cancel()
         hubAlertTask = schedule(after: max(hub.settings.alertSeconds, 2)) { $0.isShowingHubAlert = false }
+    }
+
+    func showThermalAlert() {
+        guard !isOpen else { return }
+        isPeeking = false
+        isShowingThermalAlert = true
+        performHaptic(.generic)
+        thermalAlertTask?.cancel()
+        thermalAlertTask = schedule(after: 6) { $0.isShowingThermalAlert = false }
     }
 
     func dismissHubAlert() {

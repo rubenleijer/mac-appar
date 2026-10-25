@@ -250,6 +250,11 @@ private struct ControlsTab: View {
         let audio = model.audio
         let brightness = model.brightness
         VStack(alignment: .leading, spacing: 0) {
+            if model.settings.showTemperature && model.thermal.isAvailable {
+                TemperatureRow()
+                    .frame(height: IslandLayout.temperatureRowHeight)
+                    .padding(.bottom, 8)
+            }
             SliderRow(
                 symbol: audio.isMuted ? "speaker.slash.fill" : "speaker.wave.3.fill",
                 variableValue: audio.isMuted ? 0 : audio.volume,

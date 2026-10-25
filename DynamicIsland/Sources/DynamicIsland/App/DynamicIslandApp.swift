@@ -27,8 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let home = HomeService(settings: settings)
         let posture = PostureService()
         let hub = AcordHubService(settings: HubSettings())
+        let thermal = ThermalService(settings: settings)
         let model = IslandModel(media: media, audio: audio, brightness: BrightnessService(), home: home,
-                                posture: posture, hub: hub, tray: TrayService(settings: settings), settings: settings)
+                                posture: posture, hub: hub, tray: TrayService(settings: settings),
+                                thermal: thermal, settings: settings)
         let settingsWindow = SettingsWindowController(model: model)
         model.onOpenSettings = { [weak settingsWindow] in settingsWindow?.show() }
         let quickAddWindow = QuickAddTaskController(model: model)
@@ -45,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.start()
         if settings.showHomeTab { home.refresh() }
         posture.start()
+        thermal.start()
         #if DEBUG
         let isRenderingSnapshots = CommandLine.arguments.contains("--snapshots")
         #else
@@ -103,5 +106,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model?.media.stop()
         model?.posture.stop()
         model?.hub.stop()
+        model?.thermal.stop()
     }
 }
