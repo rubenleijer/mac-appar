@@ -170,10 +170,13 @@ struct HubTaskDetailView: View {
         let hub = model.hub
         if let task = hub.selectedTask {
             VStack(alignment: .leading, spacing: 7) {
-                header(task)
-                meta(task)
-                actions(task)
-                ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 7) {
+                    header(task)
+                    meta(task)
+                    actions(task)
+                }
+                .zIndex(1)
+                IslandScroll {
                     VStack(alignment: .leading, spacing: 8) {
                         if let text = task.detail, !text.isEmpty {
                             Text(text)
@@ -186,7 +189,6 @@ struct HubTaskDetailView: View {
                     }
                     .padding(.bottom, 8)
                 }
-                .scrollIndicators(.never)
             }
         } else {
             Color.clear.onAppear { hub.select(nil) }

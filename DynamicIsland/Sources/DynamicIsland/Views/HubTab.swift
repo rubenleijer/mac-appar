@@ -9,6 +9,7 @@ struct HubTab: View {
         let hub = model.hub
         VStack(alignment: .leading, spacing: 6) {
             toolbar
+                .zIndex(1)
             Group {
                 if !hub.isConfigured && hub.lastUpdated == nil {
                     HubSetupState()
@@ -163,12 +164,11 @@ private struct HubList<Item: Identifiable, Row: View>: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.opacity)
         } else {
-            ScrollView(.vertical) {
-                LazyVStack(spacing: 0) {
+            IslandScroll {
+                VStack(spacing: 0) {
                     ForEach(items) { item in row(item) }
                 }
             }
-            .scrollIndicators(.never)
             .padding(.horizontal, -6)
             .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.9),
                                          .init(color: .black.opacity(0), location: 1)],

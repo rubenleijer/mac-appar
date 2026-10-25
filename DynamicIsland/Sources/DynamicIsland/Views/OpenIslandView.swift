@@ -276,8 +276,7 @@ private struct ControlsTab: View {
 
             Group {
                 if audio.devices.count > IslandLayout.maxVisibleDevices {
-                    ScrollView(.vertical) { deviceList }
-                        .scrollIndicators(.never)
+                    IslandScroll { deviceList }
                 } else {
                     deviceList
                 }

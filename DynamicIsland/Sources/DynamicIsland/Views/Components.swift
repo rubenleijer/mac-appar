@@ -248,3 +248,86 @@ func formatTime(_ seconds: Double) -> String {
     let secs = total % 60
     return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, secs) : String(format: "%d:%02d", minutes, secs)
 }
+
+// MARK: - Scrolling
+
+/// A scroll container for the island. SwiftUI's `ScrollView` is backed by an `NSScrollView`, which
+/// swallows the first click in a window that isn't key – and the island panel is never key, so
+/// every click inside a `ScrollView` was lost. This one moves its content with an offset instead,
+/// fed by scroll-wheel and trackpad events, so buttons and rows inside it stay clickable.
+struct IslandScroll<Content: View>: View {
+    var axis: Axis = .vertical
+    @ViewBuilder var content: Content
+
+    @State private var offset: CGFloat = 0
+    @State private var viewport: CGFloat = 0
+    @State private var contentLength: CGFloat = 0
+    @State private var id = UUID()
+
+    var body: some View {
+        let limit = max(contentLength - viewport, 0)
+        let shown = min(max(offset, 0), limit)
+        ZStack(alignment: .topLeading) {
+            content
+                .fixedSize(horizontal: axis == .horizontal, vertical: axis == .vertical)
+                .frame(maxWidth: axis == .vertical ? .infinity : nil,
+                       maxHeight: axis == .horizontal ? .infinity : nil, alignment: .topLeading)
+                .onGeometryChange(for: CGFloat.self, of: { axis == .vertical ? $0.size.height : $0.size.width }) {
+                    contentLength = $0
+                }
+                .offset(x: axis == .horizontal ? -shown : 0, y: axis == .vertical ? -shown : 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onGeometryChange(for: CGFloat.self, of: { axis == .vertical ? $0.size.height : $0.size.width }) {
+            viewport = $0
+        }
+        .clipShape(Rectangle())
+        .contentShape(Rectangle())
+        .onHover { inside in
+            if inside {
+                let offset = $offset, viewport = $viewport, contentLength = $contentLength, axis = axis
+                IslandScrollRouter.shared.enter(id) { event in
+                    let limit = max(contentLength.wrappedValue - viewport.wrappedValue, 0)
+                    guard limit > 0 else { return false }
+                    let scale: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 12
+                    var delta = axis == .vertical ? event.scrollingDeltaY : event.scrollingDeltaX
+                    // A plain mouse wheel only scrolls vertically; let it move horizontal rows too.
+                    if axis == .horizontal, abs(event.scrollingDeltaX) < abs(event.scrollingDeltaY) { delta = event.scrollingDeltaY }
+                    let current = min(max(offset.wrappedValue, 0), limit)
+                    offset.wrappedValue = min(max(current - delta * scale, 0), limit)
+                    return true
+                }
+            } else {
+                IslandScrollRouter.shared.leave(id)
+            }
+        }
+        .onDisappear { IslandScrollRouter.shared.leave(id) }
+    }
+}
+
+/// Sends scroll events in the island to the `IslandScroll` under the pointer.
+@MainActor
+final class IslandScrollRouter {
+    static let shared = IslandScrollRouter()
+
+    private var stack: [(id: UUID, handler: (NSEvent) -> Bool)] = []
+    private var monitor: Any?
+
+    func enter(_ id: UUID, handler: @escaping (NSEvent) -> Bool) {
+        stack.removeAll { $0.id == id }
+        stack.append((id, handler))
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            let handled = MainActor.assumeIsolated { IslandScrollRouter.shared.route(event) }
+            return handled ? nil : event
+        }
+    }
+
+    func leave(_ id: UUID) {
+        stack.removeAll { $0.id == id }
+    }
+
+    private func route(_ event: NSEvent) -> Bool {
+        stack.last?.handler(event) ?? false
+    }
+}

@@ -48,13 +48,12 @@ struct TrayTab: View {
                     }
                     .foregroundStyle(.white.opacity(0.8))
                 } else {
-                    ScrollView(.horizontal) {
-                        LazyHStack(spacing: 6) {
+                    IslandScroll(axis: .horizontal) {
+                        HStack(spacing: 6) {
                             ForEach(tray.items) { item in TrayTile(item: item) }
                         }
                         .padding(.horizontal, 6)
                     }
-                    .scrollIndicators(.never)
                 }
             }
             .frame(height: 106)

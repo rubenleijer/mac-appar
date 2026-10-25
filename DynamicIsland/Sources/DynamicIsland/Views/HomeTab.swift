@@ -42,7 +42,7 @@ struct HomeTab: View {
 
         return Group {
             if rows.count > IslandLayout.maxHomeRows {
-                ScrollView(.vertical) { grid }.scrollIndicators(.never)
+                IslandScroll { grid }
             } else {
                 grid
             }
