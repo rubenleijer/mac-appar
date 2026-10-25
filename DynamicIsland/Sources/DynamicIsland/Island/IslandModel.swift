@@ -236,7 +236,7 @@ final class IslandModel {
 
     /// The Hub tab grows with its list – up to four cards or five rows – so cards are never cut off.
     var hubContentHeight: CGFloat {
-        let toolbar: CGFloat = 34, bottom: CGFloat = 18
+        let toolbar: CGFloat = 34, bottom: CGFloat = 32
         guard hub.lastUpdated != nil else { return IslandLayout.hubContentHeight }
         if hub.selectedTaskID != nil { return IslandLayout.hubContentHeight }
         let section = hub.settings.visibleSections.contains(hub.section) ? hub.section : (hub.settings.visibleSections.first ?? .tasks)

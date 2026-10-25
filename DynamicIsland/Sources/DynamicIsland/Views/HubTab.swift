@@ -174,6 +174,8 @@ private struct HubList<Item: Identifiable, Row: View>: View {
                 VStack(spacing: 0) {
                     ForEach(items) { item in row(item) }
                 }
+                // Room under the last item, so it never sits on the island's rounded bottom.
+                .padding(.bottom, 10)
             }
             .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.94),
                                          .init(color: .black.opacity(0.2), location: 1)],
