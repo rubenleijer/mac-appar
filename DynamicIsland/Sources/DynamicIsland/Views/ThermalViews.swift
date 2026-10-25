@@ -85,51 +85,60 @@ private struct Sparkline: View {
     }
 }
 
-/// Beside the notch: temperature on the left; on the right, the time right after the camera
-/// and the battery at the far end. The colon blinks with the seconds.
+/// Beside the notch. With the clock: the time right against the camera on the left – as near
+/// the middle as there are pixels – and temperature and battery together on the right. Without
+/// it: temperature left, battery right.
 struct CompactThermalView: View {
     @Environment(IslandModel.self) private var model
 
     var body: some View {
         let thermal = model.thermal
-        let color = ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold)
         let showsClock = model.settings.showClockInNotch
         HStack(spacing: 0) {
-            HStack(spacing: 3) {
-                Image(systemName: "thermometer.medium").font(.system(size: 11, weight: .semibold))
-                Text(thermal.cpuText)
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .contentTransition(.numericText())
+            Group {
+                if showsClock {
+                    NotchClock()
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.trailing, 8)
+                } else {
+                    temperature
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 10)
+                }
             }
-            .foregroundStyle(color)
-            .frame(width: model.thermalLeftWidth, alignment: .leading)
-            .padding(.leading, 10)
+            .frame(width: model.thermalSideWidth + 10)
 
             Spacer(minLength: model.notch.width)
 
-            HStack(spacing: 0) {
-                if showsClock {
-                    NotchClock()
-                        .padding(.leading, 8)
-                }
-                Spacer(minLength: 8)
+            HStack(spacing: 7) {
+                if showsClock { temperature }
                 if let battery = thermal.battery {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 2) {
                         Text("\(battery.percent)%")
                             .font(.system(size: 12, weight: .semibold).monospacedDigit())
                             .contentTransition(.numericText())
-                        Image(systemName: battery.symbol).font(.system(size: 12, weight: .semibold))
+                        Image(systemName: battery.symbol).font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundStyle(BatteryBadge.color(battery))
                 }
             }
-            .frame(width: model.thermalRightWidth)
-            .padding(.trailing, 10)
+            .frame(maxWidth: .infinity, alignment: showsClock ? .leading : .trailing)
+            .padding(showsClock ? .leading : .trailing, showsClock ? 8 : 10)
+            .frame(width: model.thermalSideWidth + 10)
         }
         .padding(.horizontal, model.earRadius)
         .frame(height: model.notch.height)
         .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
         .animation(.easeInOut(duration: 0.4), value: thermal.battery)
+    }
+
+    private var temperature: some View {
+        let thermal = model.thermal
+        return Text(thermal.cpuText)
+            .font(.system(size: 12, weight: .semibold).monospacedDigit())
+            .foregroundStyle(ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold))
+            .contentTransition(.numericText())
+            .help("CPU temperature")
     }
 }
 
