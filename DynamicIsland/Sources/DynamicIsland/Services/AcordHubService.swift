@@ -508,7 +508,7 @@ final class AcordHubService {
         }
     }
 
-    static func durationText(_ seconds: TimeInterval) -> String {
+    nonisolated static func durationText(_ seconds: TimeInterval) -> String {
         let minutes = Int(seconds / 60)
         if minutes < 1 { return "under a minute" }
         if minutes < 60 { return "\(minutes) min" }
@@ -798,7 +798,7 @@ final class AcordHubService {
         if let data = try? JSONEncoder().encode(notifications) { defaults.set(data, forKey: Self.feedKey) }
     }
 
-    static func dayName(_ day: Date, now: Date) -> String {
+    nonisolated static func dayName(_ day: Date, now: Date) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(day) { return "today" }
         if calendar.isDateInTomorrow(day) { return "tomorrow" }
