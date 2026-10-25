@@ -19,6 +19,9 @@ struct OpenIslandView: View {
                 case .hub:
                     HubTab()
                         .transition(.islandContent(scale: 0.97))
+                case .tray:
+                    TrayTab()
+                        .transition(.islandContent(scale: 0.97))
                 case .posture:
                     PostureTab()
                         .transition(.islandContent(scale: 0.97))
@@ -39,6 +42,9 @@ struct OpenIslandView: View {
                 tabButton(.media, symbol: "music.note", help: "Now Playing")
                 if model.showsHubTab {
                     tabButton(.hub, symbol: "checklist", help: "Acord Hub", badge: model.hub.unreadCount)
+                }
+                if model.settings.showTrayTab {
+                    tabButton(.tray, symbol: model.tray.items.isEmpty ? "tray.fill" : "tray.full.fill", help: "Tray")
                 }
                 if model.settings.showHomeTab {
                     tabButton(.home, symbol: "house.fill", help: "Home")

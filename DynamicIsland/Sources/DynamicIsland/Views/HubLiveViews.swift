@@ -81,6 +81,7 @@ struct CompactHubView: View {
         case .ongoingEvent: "person.2.fill"
         case .post: "paperplane.fill"
         case .overdue: "exclamationmark.circle.fill"
+        case .timer: "stopwatch.fill"
         }
     }
 
@@ -90,6 +91,7 @@ struct CompactHubView: View {
         case .ongoingEvent: .green
         case .post: .pink
         case .overdue: Color(red: 1, green: 0.36, blue: 0.34)
+        case .timer: .green
         }
     }
 
@@ -98,6 +100,7 @@ struct CompactHubView: View {
         case .ongoingEvent: "Now"
         case .post: "Post"
         case .overdue: "Late"
+        case .timer: "Focus"
         default: "Next"
         }
     }
@@ -107,6 +110,9 @@ struct CompactHubView: View {
         switch item.kind {
         case .overdue:
             return "\(item.count)"
+        case .timer:
+            guard let start = item.date else { return "" }
+            return clockText(now.timeIntervalSince(start))
         case .ongoingEvent:
             guard let end = item.date else { return "Now" }
             return shortDuration(end.timeIntervalSince(now))

@@ -59,6 +59,30 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show Tray tab", isOn: $settings.showTrayTab)
+                Toggle("Open the tray when dragging files to the notch", isOn: $settings.openTrayOnDrag)
+                    .disabled(!settings.showTrayTab)
+                Picker("Remove items after", selection: $settings.trayRetentionDays) {
+                    Text("Never").tag(0)
+                    Text("1 day").tag(1)
+                    Text("1 week").tag(7)
+                    Text("30 days").tag(30)
+                }
+                .disabled(!settings.showTrayTab)
+                HStack {
+                    Text(model.tray.items.count == 1 ? "1 item" : "\(model.tray.items.count) items").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Show Folder") { model.tray.openFolder() }
+                    Button("Empty Tray") { model.tray.clear() }.disabled(model.tray.items.isEmpty)
+                }
+            } header: {
+                Text("Tray")
+            } footer: {
+                Text("Drag files, images or links onto the notch to keep them in the tray, then drag them out into any app. Items are copied, so the originals can move. Removed items go to the Trash.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Show Home tab", isOn: $settings.showHomeTab)
                 TextField("Shortcuts folder", text: $settings.homeFolderName)
                     .onSubmit { model.home.refresh() }

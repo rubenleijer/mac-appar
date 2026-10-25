@@ -96,12 +96,17 @@ struct HubSettingsView: View {
                 Picker("Lowest priority", selection: $settings.minimumPriority) {
                     ForEach(HubPriority.allCases) { Text($0.title).tag($0) }
                 }
-                Picker("Due within", selection: $settings.taskHorizonDays) {
+                Picker("Due", selection: $settings.taskHorizonDays) {
                     Text("Any time").tag(0)
                     Text("Today").tag(1)
-                    ForEach([3, 7, 14, 30], id: \.self) { Text("\($0) days").tag($0) }
+                    ForEach([3, 7, 14, 30], id: \.self) { Text("Within \($0) days").tag($0) }
                 }
+                Toggle("Include overdue tasks", isOn: $settings.includeOverdue)
+                    .disabled(settings.taskHorizonDays == 0)
                 Toggle("Include tasks without a due date", isOn: $settings.showUndatedTasks)
+                    .disabled(settings.taskHorizonDays != 0)
+                Toggle("Ask before marking a task done", isOn: $settings.confirmComplete)
+                Toggle("Starting a timer moves the task to In progress", isOn: $settings.timerStartsTask)
                 Toggle("Sort by priority before due date", isOn: $settings.sortByPriority)
             }
 
@@ -205,7 +210,7 @@ struct HubSettingsView: View {
             // MARK: Advanced
             Section {
                 DisclosureGroup("Links into the Hub", isExpanded: $showsAdvanced) {
-                    TextField("Tasks", text: $settings.tasksPath, prompt: Text("/tasks"))
+                    TextField("Tasks", text: $settings.tasksPath, prompt: Text("/tasks/{id}"))
                     TextField("Calendar", text: $settings.calendarPath, prompt: Text("/calendar"))
                     TextField("Approvals", text: $settings.approvalsPath, prompt: Text("/approvals"))
                     TextField("Content", text: $settings.contentPath, prompt: Text("/planner"))
@@ -218,7 +223,7 @@ struct HubSettingsView: View {
             } header: {
                 Text("Advanced")
             } footer: {
-                Text("Paths are added to the web address when you click a row or the ↗ button. Leave them empty to open the start page.")
+                Text("Paths are added to the web address when you click ↗. Put {id} where the task’s id goes to open a task directly, for example /tasks/{id}. Leave empty to open the start page.")
                     .foregroundStyle(.secondary)
             }
         }

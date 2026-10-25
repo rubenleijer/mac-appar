@@ -13,6 +13,10 @@ final class AppSettings {
     var showPostureAlerts: Bool { didSet { store(showPostureAlerts, Key.showPostureAlerts) } }
     var showPostureLiveActivity: Bool { didSet { store(showPostureLiveActivity, Key.showPostureLiveActivity) } }
     var homeFolderName: String { didSet { defaults.set(homeFolderName, forKey: Key.homeFolderName) } }
+    var showTrayTab: Bool { didSet { store(showTrayTab, Key.showTrayTab) } }
+    var openTrayOnDrag: Bool { didSet { store(openTrayOnDrag, Key.openTrayOnDrag) } }
+    /// Days before tray items go to the Trash; 0 keeps them.
+    var trayRetentionDays: Int { didSet { defaults.set(trayRetentionDays, forKey: Key.trayRetentionDays) } }
     var replaceSystemHUD: Bool {
         didSet {
             store(replaceSystemHUD, Key.replaceSystemHUD)
@@ -35,6 +39,9 @@ final class AppSettings {
         static let showPostureTab = "showPostureTab"
         static let showPostureAlerts = "showPostureAlerts"
         static let showPostureLiveActivity = "showPostureLiveActivity"
+        static let showTrayTab = "showTrayTab"
+        static let openTrayOnDrag = "openTrayOnDrag"
+        static let trayRetentionDays = "trayRetentionDays"
     }
 
     @ObservationIgnored private let defaults = UserDefaults.standard
@@ -48,7 +55,10 @@ final class AppSettings {
             Key.showVolumeHUD: true,
             Key.showDeviceChanges: true,
             Key.replaceSystemHUD: false,
-            Key.showHomeTab: true,
+            Key.showHomeTab: false,
+            Key.showTrayTab: true,
+            Key.openTrayOnDrag: true,
+            Key.trayRetentionDays: 0,
             Key.homeFolderName: "Home",
             Key.showPostureTab: true,
             Key.showPostureAlerts: true,
@@ -66,6 +76,15 @@ final class AppSettings {
         showPostureAlerts = defaults.bool(forKey: Key.showPostureAlerts)
         showPostureLiveActivity = defaults.bool(forKey: Key.showPostureLiveActivity)
         homeFolderName = defaults.string(forKey: Key.homeFolderName) ?? "Home"
+        showTrayTab = defaults.bool(forKey: Key.showTrayTab)
+        openTrayOnDrag = defaults.bool(forKey: Key.openTrayOnDrag)
+        trayRetentionDays = defaults.integer(forKey: Key.trayRetentionDays)
+        // The tray replaced the Home tab; hide Home once for anyone who had it on.
+        if !defaults.bool(forKey: "didReplaceHomeWithTray") {
+            showHomeTab = false
+            defaults.set(false, forKey: Key.showHomeTab)
+            defaults.set(true, forKey: "didReplaceHomeWithTray")
+        }
     }
 
     private func store(_ value: Bool, _ key: String) {

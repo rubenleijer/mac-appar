@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum IslandTab: Hashable {
-    case media, hub, home, controls, posture
+    case media, hub, tray, home, controls, posture
 }
 
 enum HUDKind: Equatable {
@@ -42,6 +42,7 @@ enum IslandLayout {
     static let homeEmptyHeight: CGFloat = 112
     static let postureContentHeight: CGFloat = 150
     static let hubContentHeight: CGFloat = 214
+    static let trayContentHeight: CGFloat = 148
 }
 
 @MainActor @Observable
@@ -52,6 +53,7 @@ final class IslandModel {
     let home: HomeService
     let posture: PostureService
     let hub: AcordHubService
+    let tray: TrayService
     let settings: AppSettings
 
     var metrics = NotchMetrics.fallback
@@ -64,6 +66,8 @@ final class IslandModel {
 
     @ObservationIgnored var onOpenSettings: (() -> Void)?
     @ObservationIgnored var onQuickAddTask: (() -> Void)?
+    /// Opens the task editor; `true` focuses a new checklist item.
+    @ObservationIgnored var onEditTask: ((HubTask, Bool) -> Void)?
     @ObservationIgnored private var openTask: Task<Void, Never>?
     @ObservationIgnored private var closeTask: Task<Void, Never>?
     @ObservationIgnored private var hudTask: Task<Void, Never>?
@@ -75,13 +79,14 @@ final class IslandModel {
     @ObservationIgnored private var permissionPoll: Timer?
 
     init(media: NowPlayingService, audio: AudioService, brightness: BrightnessService, home: HomeService,
-         posture: PostureService, hub: AcordHubService, settings: AppSettings) {
+         posture: PostureService, hub: AcordHubService, tray: TrayService, settings: AppSettings) {
         self.media = media
         self.audio = audio
         self.brightness = brightness
         self.home = home
         self.posture = posture
         self.hub = hub
+        self.tray = tray
         self.settings = settings
 
         media.onTrackChange = { [weak self] in self?.showTrackPeek() }
@@ -111,7 +116,7 @@ final class IslandModel {
         if isShowingHubAlert && hub.latestAlert != nil { return .hubAlert }
         if isPeeking && media.hasMedia { return .peek }
         if showsHubTab, hub.settings.livePriorityOverMusic, let kind = hub.liveItem?.kind,
-           kind == .event || kind == .ongoingEvent { return .hubCompact }
+           kind == .event || kind == .ongoingEvent || kind == .timer { return .hubCompact }
         if settings.showLiveActivity && media.hasMedia && media.isPlaying { return .compact }
         if showsPostureCompact { return .postureCompact }
         if showsHubTab && hub.liveItem != nil { return .hubCompact }
@@ -195,6 +200,7 @@ final class IslandModel {
         switch tab {
         case .home where !settings.showHomeTab: .media
         case .hub where !showsHubTab: .media
+        case .tray where !settings.showTrayTab: .media
         case .posture where !showsPostureTab: .media
         default: tab
         }
@@ -213,6 +219,8 @@ final class IslandModel {
             return IslandLayout.postureContentHeight
         case .hub:
             return IslandLayout.hubContentHeight
+        case .tray:
+            return IslandLayout.trayContentHeight
         case .controls:
             let sliders: CGFloat = brightness.isAvailable ? 2 : 1
             let rows = CGFloat(min(audio.devices.count, IslandLayout.maxVisibleDevices))
@@ -249,6 +257,13 @@ final class IslandModel {
 
         if hovering {
             closeTask?.cancel()
+            // Something is being dragged onto the notch: open straight onto the tray.
+            if settings.showTrayTab, settings.openTrayOnDrag, Self.isDraggingContent {
+                openTask?.cancel()
+                if !isOpen { open() }
+                select(.tray)
+                return
+            }
             if settings.hoverToOpen && !isOpen {
                 // Trackpad haptics only play while a finger touches the pad, so they go out
                 // with the movement that reached the notch, not with the delayed open.
@@ -258,7 +273,7 @@ final class IslandModel {
         } else {
             openTask?.cancel()
             if isOpen {
-                closeTask = schedule(after: 0.22) { $0.close() }
+                closeTask = schedule(after: 0.22) { $0.closeUnlessDragging() }
             }
         }
     }
@@ -273,8 +288,12 @@ final class IslandModel {
         hud = nil
         isPeeking = false
         isShowingPostureAlert = false
-        // An alert that was showing opens the island on the item it was about.
-        if isShowingHubAlert, let alert = hub.latestAlert, showsHubTab {
+        // An alert that was showing opens the island on the item it was about, a running timer on its task.
+        if presentation == .hubCompact, let timer = hub.timer, let task = hub.tasks.first(where: { $0.id == timer.taskID }) {
+            tab = .hub
+            hub.section = .tasks
+            hub.select(task)
+        } else if isShowingHubAlert, let alert = hub.latestAlert, showsHubTab {
             tab = .hub
             if let section = alert.section.flatMap(HubSection.init(rawValue:)) { hub.section = section }
         } else {
@@ -302,9 +321,25 @@ final class IslandModel {
 
     func toggle() { isOpen ? close() : open() }
 
+    /// Dragging a file out of the tray leaves the island; it stays open until the drop.
+    private func closeUnlessDragging() {
+        guard currentTab == .tray, NSEvent.pressedMouseButtons & 1 != 0 else { return close() }
+        closeTask = schedule(after: 0.25) { model in
+            if !model.isHovering { model.closeUnlessDragging() }
+        }
+    }
+
+    /// The mouse button is down and the drag pasteboard holds something the tray accepts.
+    private static var isDraggingContent: Bool {
+        guard NSEvent.pressedMouseButtons & 1 != 0 else { return false }
+        let types = NSPasteboard(name: .drag).types ?? []
+        return types.contains(.fileURL) || types.contains(.png) || types.contains(.tiff) || types.contains(.URL)
+    }
+
     func select(_ tab: IslandTab) {
         if tab == .home { home.refresh() }
         if tab == .hub { hub.refresh() }
+        if tab == .tray { tray.reload() }
         guard tab != self.tab else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { self.tab = tab }
     }

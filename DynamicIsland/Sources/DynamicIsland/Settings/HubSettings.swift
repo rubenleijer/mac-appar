@@ -104,8 +104,14 @@ final class HubSettings {
     var taskScope: HubTaskScope { didSet { persist(taskScope.rawValue, .taskScope) } }
     var taskStatuses: Set<HubTaskStatus> { didSet { persist(taskStatuses.map(\.rawValue), .taskStatuses) } }
     var minimumPriority: HubPriority { didSet { persist(minimumPriority.rawValue, .minimumPriority) } }
-    /// Only tasks due within this many days; 0 shows every task, including those without a date.
+    /// Only tasks due within this many days (1 = today); 0 shows every task, including those without a date.
     var taskHorizonDays: Int { didSet { persist(taskHorizonDays, .taskHorizonDays) } }
+    /// With a horizon set, also show tasks whose day has passed.
+    var includeOverdue: Bool { didSet { persist(includeOverdue, .includeOverdue) } }
+    /// Ask before marking a task done from the island.
+    var confirmComplete: Bool { didSet { persist(confirmComplete, .confirmComplete) } }
+    /// Starting the timer on a task moves it to In progress in the Hub.
+    var timerStartsTask: Bool { didSet { persist(timerStartsTask, .timerStartsTask) } }
     var showUndatedTasks: Bool { didSet { persist(showUndatedTasks, .showUndatedTasks) } }
     var sortByPriority: Bool { didSet { persist(sortByPriority, .sortByPriority) } }
 
@@ -162,6 +168,12 @@ final class HubSettings {
 
     var visibleSections: [HubSection] { sectionOrder.filter { !hiddenSections.contains($0) } }
 
+    /// Whether the task list is limited to today (and overdue).
+    var showsTodayOnly: Bool {
+        get { taskHorizonDays == 1 }
+        set { taskHorizonDays = newValue ? 1 : 0 }
+    }
+
     func path(for section: HubSection) -> String {
         switch section {
         case .tasks: tasksPath
@@ -205,6 +217,7 @@ final class HubSettings {
         case showTab, serverURL, webURL, memberID, refreshMinutes, startTab
         case sectionOrder, hiddenSections, showCounts, showClientNames
         case taskScope, taskStatuses, minimumPriority, taskHorizonDays, showUndatedTasks, sortByPriority
+        case includeOverdue, confirmComplete, timerStartsTask
         case calendarDays, pendingApprovalsOnly, contentDays, includeDraftPosts
         case notifyNewTask, notifyDueSoon, dueSoonDays, notifyOverdue, notifyEventSoon, eventLeadMinutes
         case notifyApprovals, notifyPostSoon, postLeadMinutes
@@ -233,7 +246,10 @@ final class HubSettings {
         .taskScope: HubTaskScope.mine.rawValue,
         .taskStatuses: [HubTaskStatus.todo.rawValue, HubTaskStatus.inProgress.rawValue],
         .minimumPriority: HubPriority.none.rawValue,
-        .taskHorizonDays: 0,
+        .taskHorizonDays: 1,
+        .includeOverdue: true,
+        .confirmComplete: false,
+        .timerStartsTask: true,
         .showUndatedTasks: true,
         .sortByPriority: false,
         .calendarDays: 7,
@@ -277,7 +293,8 @@ final class HubSettings {
         startTab = .lastUsed; sectionOrder = HubSection.allCases; hiddenSections = []
         showCounts = true; showClientNames = true
         taskScope = .mine; taskStatuses = [.todo, .inProgress]; minimumPriority = .none
-        taskHorizonDays = 0; showUndatedTasks = true; sortByPriority = false
+        taskHorizonDays = 1; showUndatedTasks = true; sortByPriority = false
+        includeOverdue = true; confirmComplete = false; timerStartsTask = true
         calendarDays = 7; pendingApprovalsOnly = true; contentDays = 7; includeDraftPosts = false
         notifyNewTask = true; notifyDueSoon = true; dueSoonDays = 0; notifyOverdue = true
         notifyEventSoon = true; eventLeadMinutes = 10; notifyApprovals = true
@@ -311,6 +328,9 @@ final class HubSettings {
         taskStatuses = Set(strings(.taskStatuses).compactMap(HubTaskStatus.init(rawValue:)))
         minimumPriority = HubPriority(rawValue: string(.minimumPriority)) ?? .none
         taskHorizonDays = int(.taskHorizonDays)
+        includeOverdue = bool(.includeOverdue)
+        confirmComplete = bool(.confirmComplete)
+        timerStartsTask = bool(.timerStartsTask)
         showUndatedTasks = bool(.showUndatedTasks)
         sortByPriority = bool(.sortByPriority)
 

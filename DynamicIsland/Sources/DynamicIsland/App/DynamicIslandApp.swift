@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var islandWindow: IslandWindowController?
     private var settingsWindow: SettingsWindowController?
     private var quickAddWindow: QuickAddTaskController?
+    private var taskEditor: TaskEditorController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installEditMenu()
@@ -27,17 +28,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let posture = PostureService()
         let hub = AcordHubService(settings: HubSettings())
         let model = IslandModel(media: media, audio: audio, brightness: BrightnessService(), home: home,
-                                posture: posture, hub: hub, settings: settings)
+                                posture: posture, hub: hub, tray: TrayService(settings: settings), settings: settings)
         let settingsWindow = SettingsWindowController(model: model)
         model.onOpenSettings = { [weak settingsWindow] in settingsWindow?.show() }
         let quickAddWindow = QuickAddTaskController(model: model)
         model.onQuickAddTask = { [weak quickAddWindow] in quickAddWindow?.show() }
+        let taskEditor = TaskEditorController(model: model)
+        model.onEditTask = { [weak taskEditor] task, checklist in taskEditor?.show(task, focusChecklist: checklist) }
 
         let islandWindow = IslandWindowController(model: model)
         islandWindow.show()
         media.start()
         audio.start()
-        home.refresh()
+        if settings.showHomeTab { home.refresh() }
         posture.start()
         #if DEBUG
         let isRenderingSnapshots = CommandLine.arguments.contains("--snapshots")
@@ -50,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.islandWindow = islandWindow
         self.settingsWindow = settingsWindow
         self.quickAddWindow = quickAddWindow
+        self.taskEditor = taskEditor
 
         #if DEBUG
         if let flag = CommandLine.arguments.firstIndex(of: "--snapshots"), flag + 1 < CommandLine.arguments.count {

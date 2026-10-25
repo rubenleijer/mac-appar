@@ -22,6 +22,14 @@ struct HubTab: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .overlay(alignment: .bottom) {
+                if let toast = hub.toast {
+                    HubToastView(toast: toast)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.82), value: hub.toast)
+            .animation(.spring(response: 0.38, dampingFraction: 0.85), value: hub.selectedTaskID)
         }
         .padding(.top, 2)
         .frame(height: IslandLayout.hubContentHeight - 14, alignment: .top)
@@ -42,10 +50,18 @@ struct HubTab: View {
                                  count: hub.settings.showCounts ? hub.count(for: section) : 0,
                                  isAlert: section == .tasks && hub.overdueCount > 0,
                                  isSelected: currentSection == section) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { hub.section = section }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        if hub.section == section || section != .tasks { hub.select(nil) }
+                        hub.section = section
+                    }
                 }
             }
             Spacer(minLength: 4)
+            if currentSection == .tasks && hub.selectedTaskID == nil {
+                TodayToggle(isOn: hub.settings.showsTodayOnly) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { hub.settings.showsTodayOnly.toggle() }
+                }
+            }
             if case .failed(let message) = hub.status, hub.lastUpdated != nil {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 11))
@@ -73,7 +89,9 @@ struct HubTab: View {
             .buttonStyle(IslandButtonStyle(diameter: 24))
             .help(updatedText)
             .disabled(!hub.isConfigured)
-            Button { hub.openWeb(currentSection == .notifications ? nil : currentSection) } label: {
+            Button {
+                if let task = hub.selectedTask { hub.openTask(task) } else { hub.openWeb(currentSection == .notifications ? nil : currentSection) }
+            } label: {
                 Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .bold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
@@ -96,8 +114,16 @@ struct HubTab: View {
         let hub = model.hub
         switch currentSection {
         case .tasks:
-            HubList(items: hub.visibleTasks, empty: ("checkmark.circle", "Nothing on your list")) { task in
-                HubTaskRow(task: task)
+            if hub.selectedTaskID != nil {
+                HubTaskDetailView()
+                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                            removal: .move(edge: .trailing).combined(with: .opacity)))
+            } else {
+                HubList(items: hub.visibleTasks,
+                        empty: ("checkmark.circle", hub.settings.showsTodayOnly ? "Nothing left for today" : "Nothing on your list")) { task in
+                    HubTaskRow(task: task)
+                }
+                .transition(.opacity)
             }
         case .calendar:
             HubList(items: hub.visibleEvents, empty: ("calendar", "No events the next \(hub.settings.calendarDays) days")) { event in
@@ -193,43 +219,7 @@ private struct HubRow<Leading: View, Trailing: View>: View {
     }
 }
 
-private struct HubTaskRow: View {
-    let task: HubTask
-    @Environment(IslandModel.self) private var model
-
-    var body: some View {
-        let hub = model.hub
-        let due = dueText
-        let parts = [due.text, hub.clientName(for: task),
-                     hub.settings.taskScope == .mine ? nil : hub.memberName(task.assigneeID),
-                     task.status == HubTaskStatus.inProgress.rawValue ? "In progress" : nil]
-        HubRow(title: task.title,
-               subtitle: parts.compactMap { $0 }.joined(separator: " · "),
-               subtitleColor: due.color,
-               action: { hub.openWeb(.tasks) }) {
-            PriorityBadge(priority: task.priority, inProgress: task.status == HubTaskStatus.inProgress.rawValue)
-        } trailing: {
-            EmptyView()
-        }
-        .contextMenu {
-            Button("Open in Acord Hub") { hub.openWeb(.tasks) }
-            Button("Copy Title") { copy(task.title) }
-            if let detail = task.detail, !detail.isEmpty { Button("Copy Description") { copy(detail) } }
-        }
-    }
-
-    private var dueText: (text: String?, color: Color) {
-        let now = model.hub.now
-        guard let days = task.daysLeft(now: now), let due = task.dueDay else { return (nil, .white.opacity(0.5)) }
-        if days < 0 {
-            return (days == -1 ? "Overdue since yesterday" : "Overdue \(-days) days", Color(red: 1, green: 0.42, blue: 0.4))
-        }
-        if days == 0 { return ("Due today", .orange) }
-        return ("Due " + AcordHubService.dayName(due, now: now), .white.opacity(0.5))
-    }
-}
-
-private struct PriorityBadge: View {
+struct PriorityBadge: View {
     let priority: HubPriority
     var inProgress = false
 
@@ -280,7 +270,7 @@ private struct HubEventRow: View {
             VStack(spacing: 0) {
                 Text(event.isAllDay ? "All" : event.start.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(isNow ? .green : .white)
+                    .foregroundStyle(isNow ? Color.green : Color.white)
                 Text(event.isAllDay ? "day" : event.start.formatted(.dateTime.weekday(.abbreviated)))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.white.opacity(0.45))
@@ -302,7 +292,7 @@ private struct HubEventRow: View {
         }
         .contextMenu {
             Button("Open in Acord Hub") { model.hub.openWeb(.calendar) }
-            Button("Copy Title") { copy(event.title) }
+            Button("Copy Title") { copyToPasteboard(event.title) }
         }
     }
 
@@ -380,7 +370,7 @@ private struct HubPostRow: View {
         }
         .contextMenu {
             Button("Open in Acord Hub") { model.hub.openWeb(.content) }
-            Button("Copy Title") { copy(post.title) }
+            Button("Copy Title") { copyToPasteboard(post.title) }
         }
     }
 }
@@ -579,7 +569,7 @@ private struct HubErrorState: View {
 
 // MARK: - Helpers
 
-private func copy(_ text: String) {
+func copyToPasteboard(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
 }
@@ -593,4 +583,50 @@ func shortDuration(_ seconds: TimeInterval) -> String {
     let hours = minutes / 60
     let rest = minutes % 60
     return rest == 0 || hours >= 3 ? "\(hours)h" : "\(hours)h \(rest)m"
+}
+
+private struct TodayToggle: View {
+    let isOn: Bool
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(isOn ? "Today" : "All")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isOn ? Color.black : Color.white.opacity(0.8))
+                .padding(.horizontal, 9)
+                .frame(height: 22)
+                .background(Capsule().fill(isOn ? Color.white.opacity(0.9) : Color.white.opacity(isHovering ? 0.16 : 0.1)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help(isOn ? "Showing today’s and overdue tasks – click to show all" : "Showing all tasks – click to show today’s")
+    }
+}
+
+private struct HubToastView: View {
+    let toast: HubToast
+    @Environment(IslandModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(toast.message)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            if toast.undo != nil {
+                Button("Undo") { model.hub.performUndo() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 28)
+        .background(Capsule().fill(Color(white: 0.2)))
+        .overlay(Capsule().strokeBorder(.white.opacity(0.1)))
+        .padding(.bottom, 4)
+    }
 }

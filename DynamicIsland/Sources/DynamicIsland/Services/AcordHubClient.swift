@@ -5,9 +5,14 @@ enum HubArgument: Sendable {
     case string(String)
     case int(Int)
     case bool(Bool)
+    case strings([String])
+    /// Clears a field.
+    case null
 
     var json: Any {
         switch self {
+        case .strings(let value): value
+        case .null: NSNull()
         case .string(let value): value
         case .int(let value): value
         case .bool(let value): value

@@ -27,6 +27,17 @@ final class AcordHubService {
     /// Ticks every 30 seconds so countdowns and "due today" stay current without a refresh.
     private(set) var now = Date()
     var section: HubSection = .tasks
+    /// The task opened in the island, if any.
+    private(set) var selectedTaskID: String?
+    private(set) var detail: HubTaskDetail?
+    private(set) var isLoadingDetail = false
+    /// Tasks and checklist items with a write on its way to the Hub.
+    private(set) var busyIDs: Set<String> = []
+    /// A short message at the bottom of the tab, with an optional undo.
+    private(set) var toast: HubToast?
+    private(set) var timer: HubTimer?
+    /// Time tracked with the island's timer, per task.
+    private(set) var trackedTime: [String: Double] = [:]
 
     @ObservationIgnored var onAlert: ((HubNotification) -> Void)?
     @ObservationIgnored private let client = AcordHubClient()
@@ -39,10 +50,14 @@ final class AcordHubService {
     @ObservationIgnored private var firedKeys: [String]
     @ObservationIgnored private var firedKeySet: Set<String>
     @ObservationIgnored private let defaults = UserDefaults.standard
+    @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private var suppressNewTasksUntil = Date.distantPast
 
     private static let firedKeysKey = "hub.firedNotificationKeys"
     private static let feedKey = "hub.notificationFeed"
     private static let baselineKey = "hub.didBaseline"
+    private static let timerKey = "hub.timer"
+    private static let trackedKey = "hub.trackedTime"
     private static let maxFeed = 80
     private static let maxFiredKeys = 1500
 
@@ -56,6 +71,10 @@ final class AcordHubService {
             notifications = feed
         }
         section = settings.visibleSections.first ?? .tasks
+        if let data = UserDefaults.standard.data(forKey: Self.timerKey) {
+            timer = try? JSONDecoder().decode(HubTimer.self, from: data)
+        }
+        trackedTime = UserDefaults.standard.dictionary(forKey: Self.trackedKey) as? [String: Double] ?? [:]
     }
 
     func start() {
@@ -93,9 +112,11 @@ final class AcordHubService {
         return scopedTasks
             .filter { statuses.contains($0.status) && $0.priority >= settings.minimumPriority }
             .filter { task in
-                guard let due = task.dueDay else { return settings.showUndatedTasks }
-                guard horizon > 0, let limit = Calendar.current.date(byAdding: .day, value: horizon, to: today) else { return true }
-                return due <= limit
+                guard horizon > 0 else { return task.dueDay != nil || settings.showUndatedTasks }
+                guard let due = task.dueDay else { return false }
+                if due < today { return settings.includeOverdue }
+                guard let limit = Calendar.current.date(byAdding: .day, value: horizon, to: today) else { return true }
+                return due < limit
             }
             .sorted { a, b in
                 if settings.sortByPriority, a.priority != b.priority { return a.priority > b.priority }
@@ -148,6 +169,7 @@ final class AcordHubService {
 
     /// The next meeting, post or the overdue pile, shown next to the notch while the island is closed.
     var liveItem: HubLiveItem? {
+        if let timer { return HubLiveItem(kind: .timer, title: timer.title, date: timer.start) }
         guard settings.showLiveActivity, lastUpdated != nil else { return nil }
         let now = self.now
         let lead = TimeInterval(settings.liveLeadMinutes * 60)
@@ -306,6 +328,263 @@ final class AcordHubService {
         return tasks.filter { seen.insert($0.id).inserted }
     }
 
+    // MARK: Task actions
+
+    var selectedTask: HubTask? {
+        guard let id = selectedTaskID else { return nil }
+        return detail?.task ?? tasks.first { $0.id == id }
+    }
+
+    /// Opens a task inside the island (nil goes back to the list) and loads its checklist.
+    func select(_ task: HubTask?) {
+        selectedTaskID = task?.id
+        detail = task.map { HubTaskDetail(task: $0, checklist: [], assigneeNames: []) }
+        if let task { loadDetail(task.id) } else { isLoadingDetail = false }
+    }
+
+    func loadDetail(_ id: String) {
+        isLoadingDetail = true
+        Task {
+            let data = await perform("get_task", ["task_id": .string(id)], showsErrors: false)
+            guard selectedTaskID == id else { return }
+            isLoadingDetail = false
+            if let data, let loaded = HubTaskDetail(data) { detail = loaded }
+        }
+    }
+
+    func complete(_ task: HubTask) {
+        if settings.confirmComplete,
+           !Self.confirm("Mark “\(task.title)” as done?", button: "Mark as Done") { return }
+        if timer?.taskID == task.id { stopTimer() }
+        if selectedTaskID == task.id { select(nil) }
+        setStatus(task, "DONE", toast: "Done: \(task.title)", undoable: true)
+    }
+
+    func toggleInProgress(_ task: HubTask) {
+        setStatus(task, task.status == HubTaskStatus.inProgress.rawValue ? "TODO" : "IN_PROGRESS")
+    }
+
+    func setStatus(_ task: HubTask, _ status: String, toast message: String? = nil, undoable: Bool = false) {
+        let old = task.status
+        guard old != status else { return }
+        updateLocal(task.id) { $0.status = status }
+        if let message {
+            var undo: (@MainActor () -> Void)?
+            if undoable {
+                undo = { [weak self] in
+                    var restored = task
+                    restored.status = status
+                    self?.setStatus(restored, old)
+                }
+            }
+            showToast(message, undo: undo)
+        }
+        write(task.id, ["status": .string(status)]) { $0.status = old }
+    }
+
+    func reschedule(_ task: HubTask, to day: Date?) {
+        let old = task.dueDay
+        let newDay = day.map { Calendar.current.startOfDay(for: $0) }
+        updateLocal(task.id) { $0.dueDay = newDay }
+        let value: HubArgument = newDay.map { HubArgument.string(HubDate.dayString($0)) } ?? HubArgument.null
+        write(task.id, ["due_date": value]) { $0.dueDay = old }
+        if let newDay {
+            showToast("Moved to \(Self.dayName(newDay, now: now)): \(task.title)")
+        } else {
+            showToast("Due date removed: \(task.title)")
+        }
+    }
+
+    func setPriority(_ task: HubTask, _ priority: HubPriority) {
+        let old = task.priority
+        updateLocal(task.id) { $0.priority = priority }
+        write(task.id, ["priority": .string(priority.rawValue)]) { $0.priority = old }
+    }
+
+    /// Saves a new title and description. Returns false if the Hub refused.
+    func updateText(_ task: HubTask, title: String, description: String) async -> Bool {
+        var arguments: [String: HubArgument] = [:]
+        if title != task.title { arguments["title"] = .string(title) }
+        if description != (task.detail ?? "") { arguments["description"] = description.isEmpty ? .null : .string(description) }
+        guard !arguments.isEmpty else { return true }
+        arguments["task_id"] = .string(task.id)
+        guard await perform("update_task", arguments, busy: task.id) != nil else { return false }
+        updateLocal(task.id) {
+            $0.title = title
+            $0.detail = description.isEmpty ? nil : description
+        }
+        return true
+    }
+
+    func delete(_ task: HubTask) {
+        guard Self.confirm("Delete “\(task.title)”?", detail: "It’s removed from Acord Hub for good.", button: "Delete") else { return }
+        if timer?.taskID == task.id { cancelTimer() }
+        if selectedTaskID == task.id { select(nil) }
+        let snapshot = tasks
+        tasks.removeAll { $0.id == task.id }
+        Task {
+            if await perform("delete_task", ["task_id": .string(task.id)], busy: task.id) == nil {
+                tasks = snapshot
+            } else {
+                showToast("Deleted: \(task.title)")
+            }
+        }
+    }
+
+    func openTask(_ task: HubTask) { openWeb(.tasks, id: task.id) }
+
+    // MARK: Checklist
+
+    func toggle(_ item: HubChecklistItem) {
+        guard let index = detail?.checklist.firstIndex(where: { $0.id == item.id }) else { return }
+        let done = !item.isDone
+        detail?.checklist[index].isDone = done
+        Task {
+            if await perform("update_checklist_item", ["item_id": .string(item.id), "done": .bool(done)], busy: item.id) == nil,
+               let index = detail?.checklist.firstIndex(where: { $0.id == item.id }) {
+                detail?.checklist[index].isDone = !done
+            }
+        }
+    }
+
+    func addChecklistItem(to taskID: String, title: String) async -> Bool {
+        guard await perform("add_checklist_item", ["task_id": .string(taskID), "title": .string(title)], busy: taskID) != nil else {
+            return false
+        }
+        if selectedTaskID == taskID { loadDetail(taskID) }
+        return true
+    }
+
+    func deleteChecklistItem(_ item: HubChecklistItem) {
+        detail?.checklist.removeAll { $0.id == item.id }
+        Task {
+            if await perform("delete_checklist_item", ["item_id": .string(item.id)], busy: item.id) == nil,
+               let id = selectedTaskID {
+                loadDetail(id)
+            }
+        }
+    }
+
+    // MARK: Timer
+
+    func startTimer(_ task: HubTask) {
+        if timer != nil { stopTimer(silently: true) }
+        timer = HubTimer(taskID: task.id, title: task.title, start: Date())
+        saveTimer()
+        if settings.timerStartsTask, task.status != HubTaskStatus.inProgress.rawValue { setStatus(task, "IN_PROGRESS") }
+    }
+
+    func stopTimer(silently: Bool = false) {
+        guard let timer else { return }
+        let elapsed = Date().timeIntervalSince(timer.start)
+        trackedTime[timer.taskID, default: 0] += elapsed
+        defaults.set(trackedTime, forKey: Self.trackedKey)
+        self.timer = nil
+        saveTimer()
+        if !silently { showToast("Tracked \(Self.durationText(elapsed)) on \(timer.title)") }
+    }
+
+    func cancelTimer() {
+        timer = nil
+        saveTimer()
+    }
+
+    func toggleTimer(_ task: HubTask) {
+        if timer?.taskID == task.id { stopTimer() } else { startTimer(task) }
+    }
+
+    /// Time tracked on a task with the island's timer, including a running timer.
+    func timeTracked(on id: String, now: Date) -> TimeInterval {
+        var total = trackedTime[id] ?? 0
+        if let timer, timer.taskID == id { total += now.timeIntervalSince(timer.start) }
+        return total
+    }
+
+    private func saveTimer() {
+        if let timer, let data = try? JSONEncoder().encode(timer) {
+            defaults.set(data, forKey: Self.timerKey)
+        } else {
+            defaults.removeObject(forKey: Self.timerKey)
+        }
+    }
+
+    static func durationText(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds / 60)
+        if minutes < 1 { return "under a minute" }
+        if minutes < 60 { return "\(minutes) min" }
+        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
+    }
+
+    // MARK: Toast
+
+    func showToast(_ message: String, undo: (@MainActor () -> Void)? = nil) {
+        toast = HubToast(message: message, undo: undo)
+        toastTask?.cancel()
+        let seconds = undo == nil ? 3.0 : 6.0
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
+    }
+
+    func performUndo() {
+        let action = toast?.undo
+        toast = nil
+        action?()
+    }
+
+    // MARK: Writing
+
+    private func updateLocal(_ id: String, _ change: (inout HubTask) -> Void) {
+        if let index = tasks.firstIndex(where: { $0.id == id }) { change(&tasks[index]) }
+        if var task = detail?.task, task.id == id {
+            change(&task)
+            detail?.task = task
+        }
+    }
+
+    /// Sends an `update_task` and puts the old value back if the Hub refuses it.
+    private func write(_ id: String, _ fields: [String: HubArgument], rollback: @escaping (inout HubTask) -> Void) {
+        var arguments = fields
+        arguments["task_id"] = .string(id)
+        suppressNewTasksUntil = Date().addingTimeInterval(120) // a recurring task's next copy isn't news
+        Task {
+            if await perform("update_task", arguments, busy: id) == nil {
+                updateLocal(id, rollback)
+            } else if fields["status"] != nil {
+                refresh(force: true)
+            }
+        }
+    }
+
+    @discardableResult
+    private func perform(_ tool: String, _ arguments: [String: HubArgument], busy id: String? = nil,
+                         showsErrors: Bool = true) async -> Data? {
+        guard let endpoint = settings.endpoint else { return nil }
+        if let id { busyIDs.insert(id) }
+        defer { if let id { busyIDs.remove(id) } }
+        await client.configure(.init(endpoint: endpoint, token: settings.token))
+        do {
+            return try await client.call(tool, arguments)
+        } catch {
+            if showsErrors {
+                showToast("Couldn’t save: " + ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription))
+            }
+            return nil
+        }
+    }
+
+    static func confirm(_ message: String, detail: String? = nil, button: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = message
+        if let detail { alert.informativeText = detail }
+        alert.addButton(withTitle: button)
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     // MARK: Actions
 
     /// Creates a task in the Hub. Assigns it to the user unless `assigneeID` says otherwise.
@@ -342,10 +621,18 @@ final class AcordHubService {
         }
     }
 
-    func openWeb(_ section: HubSection? = nil) {
+    /// Opens the Hub in the browser. A path containing `{id}` links straight to the item.
+    func openWeb(_ section: HubSection? = nil, id: String? = nil) {
         var address = settings.webURL.trimmingCharacters(in: .whitespaces)
         if let section {
-            let path = settings.path(for: section).trimmingCharacters(in: .whitespaces)
+            var path = settings.path(for: section).trimmingCharacters(in: .whitespaces)
+            if path.contains("{id}") {
+                if let id {
+                    path = path.replacingOccurrences(of: "{id}", with: id)
+                } else {
+                    path = path.replacingOccurrences(of: "/{id}", with: "").replacingOccurrences(of: "{id}", with: "")
+                }
+            }
             if !path.isEmpty {
                 if address.hasSuffix("/") { address.removeLast() }
                 address += path.hasPrefix("/") ? path : "/" + path
@@ -393,7 +680,7 @@ final class AcordHubService {
         let now = self.now
 
         let relevant = scopedTasks.filter { Set(settings.taskStatuses.map(\.rawValue)).contains($0.status) }
-        if let known = knownTaskIDs, settings.notifyNewTask {
+        if let known = knownTaskIDs, settings.notifyNewTask, Date() > suppressNewTasksUntil {
             for task in relevant where !known.contains(task.id) {
                 let from = clientName(for: task).map { " · \($0)" } ?? ""
                 fresh.append(.init(id: "new-\(task.id)", kind: .newTask, title: task.title,
@@ -552,4 +839,13 @@ final class AcordHubService {
         latestAlertBatch = 1
     }
     #endif
+}
+
+/// A short message at the bottom of the Hub tab.
+struct HubToast: Identifiable, Equatable {
+    let id = UUID()
+    var message: String
+    var undo: (@MainActor () -> Void)?
+
+    static func == (lhs: HubToast, rhs: HubToast) -> Bool { lhs.id == rhs.id }
 }

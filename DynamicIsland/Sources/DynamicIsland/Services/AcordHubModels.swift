@@ -4,12 +4,12 @@ import Foundation
 
 struct HubTask: Identifiable, Equatable {
     let id: String
-    let title: String
-    let detail: String?
-    let status: String
-    let priority: HubPriority
+    var title: String
+    var detail: String?
+    var status: String
+    var priority: HubPriority
     /// The Hub stores due dates as days; this is the start of that day, local time.
-    let dueDay: Date?
+    var dueDay: Date?
     let assigneeID: String?
     let clientID: String?
     let projectID: String?
@@ -24,6 +24,26 @@ struct HubTask: Identifiable, Equatable {
         guard let dueDay else { return nil }
         return Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: now), to: dueDay).day
     }
+}
+
+struct HubChecklistItem: Identifiable, Equatable {
+    let id: String
+    var title: String
+    var isDone: Bool
+}
+
+/// A task with everything `get_task` adds: the checklist and the assignees' names.
+struct HubTaskDetail: Equatable {
+    var task: HubTask
+    var checklist: [HubChecklistItem]
+    var assigneeNames: [String]
+}
+
+/// A running focus timer on a task. Kept on this Mac; the Hub has no timer tool yet.
+struct HubTimer: Codable, Equatable {
+    var taskID: String
+    var title: String
+    var start: Date
 }
 
 struct HubEvent: Identifiable, Equatable {
@@ -126,7 +146,7 @@ struct HubNotification: Identifiable, Equatable, Codable {
 
 /// The one thing worth showing next to the notch while the island is closed.
 struct HubLiveItem: Equatable {
-    enum Kind: Equatable { case event, ongoingEvent, post, overdue }
+    enum Kind: Equatable { case event, ongoingEvent, post, overdue, timer }
     var kind: Kind
     var title: String
     var date: Date?
@@ -232,6 +252,34 @@ extension HubTask {
                   assigneeID: json.string("assignee_id", "assigneeId", "assignee"),
                   clientID: json.string("client_id", "clientId"),
                   projectID: json.string("project_id", "projectId"))
+    }
+}
+
+extension HubChecklistItem {
+    init?(_ json: HubJSON) {
+        guard let id = json.string("id"), let title = json.string("title", "text", "name", "content") else { return nil }
+        let done = json.bool("done", "is_done", "isDone", "completed", "checked")
+            ?? (json.string("completed_at", "completedAt", "done_at") != nil)
+        self.init(id: id, title: title, isDone: done)
+    }
+}
+
+extension HubTaskDetail {
+    /// Reads `get_task`, which may wrap the task in `task` and name the checklist differently.
+    init?(_ data: Data) {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let raw = (object["task"] as? [String: Any]) ?? object
+        let json = HubJSON(raw: raw)
+        guard let task = HubTask(json) ?? HubTask(HubJSON(raw: raw.filter { $0.key != "archived_at" })) else { return nil }
+        var items: [[String: Any]] = []
+        for key in ["checklist", "checklist_items", "checklistItems", "items", "subtasks", "sub_items"] {
+            if let list = (raw[key] ?? object[key]) as? [[String: Any]] { items = list; break }
+        }
+        var names: [String] = []
+        if let assignees = (raw["assignees"] ?? object["assignees"]) as? [[String: Any]] {
+            names = assignees.compactMap { HubJSON(raw: $0).string("name", "username") }
+        }
+        self.init(task: task, checklist: items.compactMap { HubChecklistItem(HubJSON(raw: $0)) }, assigneeNames: names)
     }
 }
 
