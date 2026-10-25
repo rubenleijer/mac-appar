@@ -64,6 +64,21 @@ actor AcordHubClient {
         if !isInitialized { try await initialize(configuration) }
     }
 
+    /// The names of the tools the server offers.
+    func listTools() async throws -> [String] {
+        guard let configuration else { throw HubError("Acord Hub is not set up") }
+        if !isInitialized { try await initialize(configuration) }
+        let result: [String: Any]
+        do {
+            result = try await request("tools/list", params: [:], configuration)
+        } catch is SessionExpired {
+            reset()
+            try await initialize(configuration)
+            result = try await request("tools/list", params: [:], configuration)
+        }
+        return (result["tools"] as? [[String: Any]])?.compactMap { $0["name"] as? String } ?? []
+    }
+
     /// Calls a tool and returns its JSON payload (the structured content, or the text content).
     func call(_ tool: String, _ arguments: [String: HubArgument] = [:]) async throws -> Data {
         guard let configuration else { throw HubError("Acord Hub is not set up") }

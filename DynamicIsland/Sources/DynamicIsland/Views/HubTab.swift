@@ -141,8 +141,13 @@ struct HubTab: View {
                 .transition(.opacity)
             }
         case .calendar:
-            HubList(items: hub.visibleEvents, empty: ("calendar", "No events the next \(hub.settings.calendarDays) days")) { event in
-                HubEventRow(event: event)
+            VStack(spacing: 6) {
+                if case .notConnected(let message, _) = hub.calendarConnection {
+                    CalendarConnectBanner(message: message)
+                }
+                HubList(items: hub.visibleEvents, empty: ("calendar", "No events the next \(hub.settings.calendarDays) days")) { event in
+                    HubEventRow(event: event)
+                }
             }
         case .approvals:
             HubList(items: hub.visibleApprovals,
@@ -281,7 +286,7 @@ private struct HubEventRow: View {
         let parts = [dayText, event.clientName, event.location]
         HubRow(title: event.title,
                subtitle: parts.compactMap { $0 }.joined(separator: " · "),
-               action: { model.hub.openWeb(.calendar) }) {
+               action: { open() }) {
             VStack(spacing: 0) {
                 Text(event.isAllDay ? "All" : event.start.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
@@ -292,7 +297,17 @@ private struct HubEventRow: View {
             }
             .fixedSize()
         } trailing: {
-            if isNow {
+            if let meet = event.meetLink, isNow || (event.start > now && event.start.timeIntervalSince(now) < 15 * 60) {
+                Button { NSWorkspace.shared.open(meet) } label: {
+                    Label("Join", systemImage: "video.fill")
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(Capsule().fill(.green))
+                }
+                .buttonStyle(.plain)
+            } else if isNow {
                 Text("Now")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.black)
@@ -308,6 +323,18 @@ private struct HubEventRow: View {
         .contextMenu {
             Button("Open in Acord Hub") { model.hub.openWeb(.calendar) }
             Button("Copy Title") { copyToPasteboard(event.title) }
+        }
+    }
+
+    /// A meeting opens its call when it's about to start or running, otherwise its calendar entry.
+    private func open() {
+        let now = model.hub.now
+        if let meet = event.meetLink, event.isOngoing(now: now) || event.start.timeIntervalSince(now) < 15 * 60 {
+            NSWorkspace.shared.open(meet)
+        } else if let link = event.webLink {
+            NSWorkspace.shared.open(link)
+        } else {
+            model.hub.openWeb(.calendar)
         }
     }
 
@@ -644,5 +671,34 @@ private struct HubToastView: View {
         .background(Capsule().fill(Color(white: 0.2)))
         .overlay(Capsule().strokeBorder(.white.opacity(0.1)))
         .padding(.bottom, 4)
+    }
+}
+
+/// Shown in the calendar when the Hub has no access to the user's Google Calendar.
+private struct CalendarConnectBanner: View {
+    let message: String
+    @Environment(IslandModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Connect your Google Calendar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            CapsuleButton(title: "Connect") { model.hub.connectCalendar() }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 44)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.orange.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.orange.opacity(0.4)))
     }
 }

@@ -235,6 +235,8 @@ final class AcordHubService {
         tasks = []; events = []; approvals = []; posts = []; team = []; projects = []; clientNames = [:]
         knownTaskIDs = nil
         approvalStatuses = nil
+        toolNames = nil
+        hubTimeTools = nil
         lastUpdated = nil
         lastDirectoryLoad = .distantPast
         refresh(force: true)
@@ -259,16 +261,17 @@ final class AcordHubService {
 
         do {
             try await client.connect()
-            async let todo = client.call("list_tasks", ["status": .string("TODO")])
-            async let doing = client.call("list_tasks", ["status": .string("IN_PROGRESS")])
-            async let unclear = Self.attempt { try await client.call("list_tasks", ["status": .string("UNCLEAR")]) }
-            async let calendar = Self.attempt {
-                try await client.call("list_calendar_events", ["from": .string(from), "to": .string(to), "limit": .int(300)])
+            if toolNames == nil {
+                do {
+                    let names = Set(try await client.listTools())
+                    toolNames = names
+                    hubTimeTools = names.contains("start_timer")
+                    HubLog.write("tools: \(names.sorted().joined(separator: ", "))")
+                } catch {
+                    HubLog.write("tools/list failed: \(error.localizedDescription)")
+                }
             }
-            async let approvals = Self.attempt { try await client.call("list_approvals", ["limit": .int(100)]) }
-            async let content = Self.attempt {
-                try await client.call("list_content_posts", ["from": .string(from), "to": .string(to), "limit": .int(200)])
-            }
+
             let needsDirectory = Date().timeIntervalSince(lastDirectoryLoad) > 30 * 60
             async let team = Self.attempt(if: needsDirectory) { try await client.call("list_team") }
             async let projects = Self.attempt(if: needsDirectory) { try await client.call("list_projects") }
@@ -276,24 +279,22 @@ final class AcordHubService {
                 try await client.call("list_clients", ["include_archived": .bool(true)])
             }
 
-            let todoData = try await todo
-            let doingData = try await doing
-            var taskData = [todoData, doingData]
-            let unclearData = await unclear
-            if let unclearData { taskData.append(unclearData) }
-            let newTasks = taskData.flatMap { HubJSON.list($0, key: "tasks").compactMap { HubTask($0) } }
-            let calendarData = await calendar
-            let approvalData = await approvals
-            let contentData = await content
+            var approvalsMissing = false
+            if toolNames?.contains("dashboard_snapshot") == true {
+                var arguments: [String: HubArgument] = ["from": .string(from), "to": .string(to)]
+                if !settings.memberID.isEmpty { arguments["user_id"] = .string(settings.memberID) }
+                let data = try await client.call("dashboard_snapshot", arguments)
+                guard let snapshot = Self.object(data) else { throw HubError("The Hub sent an unreadable snapshot") }
+                guard !Task.isCancelled else { return }
+                approvalsMissing = !apply(snapshot: snapshot)
+            } else {
+                approvalsMissing = try await refreshTool(by: client, from: from, to: to)
+            }
+
             let teamData = await team
             let projectData = await projects
             let clientData = await clients
             guard !Task.isCancelled else { return }
-
-            tasks = Self.unique(newTasks)
-            if let calendarData { events = HubJSON.list(calendarData, key: "events").compactMap { HubEvent($0) } }
-            if let approvalData { self.approvals = HubJSON.list(approvalData, key: "approvals").compactMap { HubApproval($0) } }
-            if let contentData { posts = HubJSON.list(contentData, key: "posts").compactMap { HubPost($0) } }
             if let teamData {
                 self.team = HubJSON.list(teamData, key: "team").compactMap { HubMember($0) }
                 lastDirectoryLoad = Date()
@@ -307,15 +308,88 @@ final class AcordHubService {
                 clientNames = names
             }
 
-            await syncHubTime()
             now = Date()
             lastUpdated = now
             status = .ready
-            evaluateNotifications(approvalsMissing: approvalData == nil)
+            evaluateNotifications(approvalsMissing: approvalsMissing)
         } catch {
             guard !Task.isCancelled else { return }
-            status = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            HubLog.write("refresh failed: \(message)")
+            status = .failed(message)
         }
+    }
+
+    /// Reads `dashboard_snapshot`: everything in one call. Returns whether approvals came through.
+    @discardableResult
+    private func apply(snapshot: [String: Any]) -> Bool {
+        func list(_ key: String, _ inner: String) -> [HubJSON]? {
+            guard let value = snapshot[key], JSONSerialization.isValidJSONObject(value) || value is [Any],
+                  let data = try? JSONSerialization.data(withJSONObject: value) else { return nil }
+            if let error = (value as? [String: Any])?["error"] as? String {
+                HubLog.write("snapshot \(key): \(error)")
+                return nil
+            }
+            return HubJSON.list(data, key: inner)
+        }
+        if let rows = list("tasks", "tasks") { tasks = Self.unique(rows.compactMap { HubTask($0) }) }
+        let approvalRows = list("approvals", "approvals")
+        if let approvalRows { approvals = approvalRows.compactMap { HubApproval($0) } }
+        if let rows = list("posts", "posts") { posts = rows.compactMap { HubPost($0) } }
+        var calendar = list("calendar_events", "events")?.compactMap { HubEvent($0) } ?? events.filter { !$0.id.hasPrefix("meeting-") }
+        if let meetings = snapshot["meetings"] as? [String: Any] {
+            if meetings["connected"] as? Bool == true {
+                calendarConnection = .connected
+                let rows = (meetings["events"] as? [[String: Any]]) ?? []
+                calendar += rows.compactMap { row in
+                    var raw = row
+                    raw["id"] = "meeting-" + (row["id"] as? String ?? UUID().uuidString)
+                    return HubEvent(HubJSON(raw: raw))
+                }
+            } else if let error = meetings["error"] as? String {
+                HubLog.write("meetings: \(error)")
+            } else {
+                calendarConnection = .notConnected(meetings["message"] as? String ?? "Google Calendar isn’t connected",
+                                                   meetings["connect_path"] as? String ?? "/api/google/calendar/connect")
+            }
+        }
+        events = calendar
+        if snapshot.keys.contains("timer") {
+            hubTimeTools = true
+            let hubTimer = (snapshot["timer"] as? [String: Any]).flatMap { HubTimer(hub: $0) }
+            if hubTimer != nil || timer?.isHub == true { timer = hubTimer }
+            if let error = snapshot["timer_error"] as? String { HubLog.write("timer: \(error)") }
+        }
+        if let minutes = (snapshot["time_today_minutes"] as? NSNumber)?.doubleValue { loggedToday = minutes * 60 }
+        return approvalRows != nil
+    }
+
+    /// The older Hub, without `dashboard_snapshot`: one call per list. Returns whether approvals were missing.
+    private func refreshTool(by client: AcordHubClient, from: String, to: String) async throws -> Bool {
+        async let todo = client.call("list_tasks", ["status": .string("TODO")])
+        async let doing = client.call("list_tasks", ["status": .string("IN_PROGRESS")])
+        async let unclear = Self.attempt { try await client.call("list_tasks", ["status": .string("UNCLEAR")]) }
+        async let calendar = Self.attempt {
+            try await client.call("list_calendar_events", ["from": .string(from), "to": .string(to), "limit": .int(300)])
+        }
+        async let approvals = Self.attempt { try await client.call("list_approvals", ["limit": .int(100)]) }
+        async let content = Self.attempt {
+            try await client.call("list_content_posts", ["from": .string(from), "to": .string(to), "limit": .int(200)])
+        }
+        let todoData = try await todo
+        let doingData = try await doing
+        var taskData = [todoData, doingData]
+        let unclearData = await unclear
+        if let unclearData { taskData.append(unclearData) }
+        let calendarData = await calendar
+        let approvalData = await approvals
+        let contentData = await content
+        tasks = Self.unique(taskData.flatMap { HubJSON.list($0, key: "tasks").compactMap { HubTask($0) } })
+        if let calendarData { events = HubJSON.list(calendarData, key: "events").compactMap { HubEvent($0) } }
+        if let approvalData { self.approvals = HubJSON.list(approvalData, key: "approvals").compactMap { HubApproval($0) } }
+        if let contentData { posts = HubJSON.list(contentData, key: "posts").compactMap { HubPost($0) } }
+        await syncHubTime()
+        return approvalData == nil
     }
 
     /// Runs an optional request; a section that fails keeps showing its previous data.
@@ -471,6 +545,26 @@ final class AcordHubService {
     /// Whether the Hub's MCP has the timer tools (`start_timer`, …). Until it does, the timer
     /// runs on this Mac only.
     private(set) var hubTimeTools: Bool?
+    /// The tools the Hub's MCP server offers, read once per connection.
+    @ObservationIgnored private var toolNames: Set<String>?
+    /// Whether the user's Google Calendar reaches the island (through the Hub).
+    private(set) var calendarConnection: CalendarConnection = .unknown
+
+    enum CalendarConnection: Equatable {
+        case unknown, connected
+        /// Not connected in the Hub; the message and the Hub path that connects it.
+        case notConnected(String, String)
+    }
+
+    /// Opens the Hub page that connects Google Calendar.
+    func connectCalendar() {
+        var path = "/api/google/calendar/connect"
+        if case .notConnected(_, let hubPath) = calendarConnection { path = hubPath }
+        var address = settings.webURL.trimmingCharacters(in: .whitespaces)
+        if address.hasSuffix("/") { address.removeLast() }
+        guard let url = URL(string: address + path) else { return }
+        NSWorkspace.shared.open(url)
+    }
     /// Time logged today in the Hub, from `list_time_entries`.
     private(set) var loggedToday: TimeInterval?
 
@@ -694,6 +788,7 @@ final class AcordHubService {
         do {
             return try await client.call(tool, arguments)
         } catch {
+            HubLog.write("\(tool) failed: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
             if showsErrors {
                 showToast("Couldn’t save: " + ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription))
             }
@@ -974,4 +1069,28 @@ struct HubToast: Identifiable, Equatable {
     var undo: (@MainActor () -> Void)?
 
     static func == (lhs: HubToast, rhs: HubToast) -> Bool { lhs.id == rhs.id }
+}
+
+/// Errors and connection facts, written to ~/Library/Logs/Dynamic Island Hub.log (kept short).
+@MainActor
+enum HubLog {
+    private static let url = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/Dynamic Island Hub.log")
+    private static var last = ""
+
+    static func write(_ message: String) {
+        guard message != last else { return } // a refresh every 30 s shouldn't repeat itself
+        last = message
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 200_000 {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let line = "\(Date().formatted(.iso8601)) \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
+    }
 }

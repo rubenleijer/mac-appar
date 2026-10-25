@@ -17,6 +17,8 @@ struct HubTask: Identifiable, Equatable {
     var assigneeIDs: [String] = []
     /// The Hub's time estimate, in minutes.
     var estimateMinutes: Int?
+    /// The estimate as the Hub's cards write it ("30 min", "2 h", "5 h+").
+    var estimateLabel: String?
 
     /// All assignees, the main one first.
     var allAssigneeIDs: [String] {
@@ -92,6 +94,12 @@ struct HubEvent: Identifiable, Equatable {
     let isAllDay: Bool
     let clientName: String?
     let location: String?
+    /// The video call (Meet) for a Google meeting.
+    var meetLink: URL?
+    /// The event in Google Calendar.
+    var webLink: URL?
+
+    var isMeeting: Bool { id.hasPrefix("meeting-") }
 
     func isOngoing(now: Date) -> Bool {
         guard !isAllDay, start <= now else { return false }
@@ -291,7 +299,8 @@ extension HubTask {
                   clientID: json.string("client_id", "clientId"),
                   projectID: json.string("project_id", "projectId"),
                   assigneeIDs: Self.assigneeIDs(json),
-                  estimateMinutes: Self.estimate(json))
+                  estimateMinutes: Self.estimate(json),
+                  estimateLabel: json.string("time_estimate_label"))
     }
 
     private static func assigneeIDs(_ json: HubJSON) -> [String] {
@@ -306,7 +315,7 @@ extension HubTask {
 
     /// Minutes from whichever estimate field the Hub sends.
     private static func estimate(_ json: HubJSON) -> Int? {
-        for key in ["estimate_minutes", "estimated_minutes", "time_estimate_minutes", "duration_minutes", "estimate", "time_estimate", "estimated_time", "duration"] {
+        for key in ["time_estimate_label", "estimate_minutes", "estimated_minutes", "time_estimate_minutes", "duration_minutes", "estimate", "time_estimate", "estimated_time", "duration"] {
             if let number = json.raw[key] as? NSNumber { return number.intValue > 0 ? number.intValue : nil }
             if let text = json.raw[key] as? String, let minutes = parseDuration(text) { return minutes }
         }
@@ -367,7 +376,9 @@ extension HubEvent {
                   end: end?.date,
                   isAllDay: json.bool("all_day", "allDay", "is_all_day") ?? start.isDateOnly,
                   clientName: json.string("client_name", "clientName"),
-                  location: json.string("location", "place"))
+                  location: json.string("location", "place"),
+                  meetLink: json.string("meet_link", "hangoutLink").flatMap(URL.init(string:)),
+                  webLink: json.string("html_link", "htmlLink").flatMap(URL.init(string:)))
     }
 }
 

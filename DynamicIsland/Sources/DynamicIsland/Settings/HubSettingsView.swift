@@ -45,6 +45,35 @@ struct HubSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section {
+                HStack {
+                    switch hub.calendarConnection {
+                    case .connected:
+                        Label("Google Calendar is connected", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    case .notConnected(let message, _):
+                        Label(message, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                    case .unknown:
+                        Label("Choose yourself under “You are” to see your meetings", systemImage: "circle.dashed")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(hub.calendarConnection == .connected ? "Reconnect…" : "Connect…") { hub.connectCalendar() }
+                }
+                HStack {
+                    Label(hub.hubTimeTools == true ? "Time is logged in Acord Hub" : "Time is kept on this Mac until the Hub has its timer tools",
+                          systemImage: hub.hubTimeTools == true ? "clock.badge.checkmark.fill" : "clock")
+                        .foregroundStyle(hub.hubTimeTools == true ? Color.green : Color.secondary)
+                    Spacer()
+                    Button("Log") { NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser
+                        .appendingPathComponent("Library/Logs/Dynamic Island Hub.log")) }
+                }
+            } header: {
+                Text("Calendar and time")
+            } footer: {
+                Text("Your Google meetings come through the Hub – connect Google there once and they show in the calendar, the live activity and reminders.")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Behavior") {
                 Picker("Refresh every", selection: $settings.refreshMinutes) {
                     Text("30 seconds").tag(0.5)

@@ -115,7 +115,11 @@ struct HubTaskRow: View {
         let hub = model.hub
         var parts: [String] = []
         if let client = hub.clientName(for: task) { parts.append(client) }
-        if let minutes = task.estimateMinutes { parts.append(estimateText(minutes)) }
+        if let label = task.estimateLabel {
+            parts.append(label)
+        } else if let minutes = task.estimateMinutes {
+            parts.append(estimateText(minutes))
+        }
         if task.status == HubTaskStatus.inProgress.rawValue { parts.append("In progress") }
         return HStack(spacing: 6) {
             if let day = style.dayText {
