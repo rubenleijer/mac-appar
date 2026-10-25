@@ -102,7 +102,7 @@ struct CompactThermalView: View {
                     .contentTransition(.numericText())
             }
             .foregroundStyle(color)
-            .frame(width: model.thermalLeftWidth)
+            .frame(width: model.thermalLeftWidth, alignment: .leading)
             .padding(.leading, 10)
 
             Spacer(minLength: model.notch.width)

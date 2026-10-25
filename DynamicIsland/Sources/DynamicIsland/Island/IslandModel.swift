@@ -165,9 +165,10 @@ final class IslandModel {
 
     var compactSideWidth: CGFloat { notch.height + 4 }
     var hudSideWidth: CGFloat { 66 }
-    /// Room for "52°" left of the notch, and the time and "82%" right of it.
-    var thermalLeftWidth: CGFloat { 64 }
+    /// Room for the time and "82%" right of the notch. The left side gets the same width: the
+    /// island is centred on the camera, so lopsided sides would slide content under the notch.
     var thermalRightWidth: CGFloat { settings.showClockInNotch ? 124 : 64 }
+    var thermalLeftWidth: CGFloat { thermalRightWidth }
 
     /// Width of the concave "ears" that blend the island into the top edge.
     var earRadius: CGFloat {
