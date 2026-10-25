@@ -106,6 +106,22 @@ final class IslandWindowController {
         }) {
             monitors.append(local)
         }
+        if let scrolls = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
+            MainActor.assumeIsolated {
+                DebugLog.write("app got scroll; panel ignores=\(self?.panel.ignoresMouseEvents as Any) open=\(self?.model.isOpen as Any)")
+            }
+            return event
+        }) {
+            monitors.append(scrolls)
+        }
+        if let globalScrolls = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.model.isOpen else { return }
+                DebugLog.write("scroll went to another app; inside=\(self.model.hoverZone.contains(NSEvent.mouseLocation)) ignores=\(self.panel.ignoresMouseEvents)")
+            }
+        }) {
+            monitors.append(globalScrolls)
+        }
         // A click anywhere else (delivered to another app) closes the island.
         if let clicks = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             MainActor.assumeIsolated {

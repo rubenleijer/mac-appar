@@ -292,6 +292,7 @@ struct IslandScroll<Content: View>: View {
         let offset = $offset, viewport = $viewport, contentLength = $contentLength, axis = axis
         IslandScrollRouter.shared.set(id, frame: frame) { event in
             let limit = max(contentLength.wrappedValue - viewport.wrappedValue, 0)
+            DebugLog.write("scroll handler content=\(contentLength.wrappedValue) viewport=\(viewport.wrappedValue) offset=\(offset.wrappedValue) dy=\(event.scrollingDeltaY) precise=\(event.hasPreciseScrollingDeltas)")
             guard limit > 0 else { return false }
             let scale: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 12
             var delta = axis == .vertical ? event.scrollingDeltaY : event.scrollingDeltaX
@@ -332,7 +333,10 @@ final class IslandScrollRouter {
     }
 
     private func route(_ event: NSEvent) -> Bool {
-        guard let window = event.window, let content = window.contentView else { return false }
+        guard let window = event.window, let content = window.contentView else {
+            DebugLog.write("scroll event without window")
+            return false
+        }
         // SwiftUI's global space has its origin at the top left of the window's content.
         let location = event.locationInWindow
         let point = CGPoint(x: location.x, y: content.bounds.height - location.y)
@@ -340,6 +344,28 @@ final class IslandScrollRouter {
         let hit = targets.values
             .filter { $0.frame.contains(point) }
             .min { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        DebugLog.write("scroll at \(point) in \(type(of: window)) targets=\(targets.values.map { $0.frame }) hit=\(hit?.frame as Any)")
         return hit?.handler(event) ?? false
+    }
+}
+
+/// Temporary diagnostics, written to ~/Library/Logs/Dynamic Island Debug.log.
+@MainActor
+enum DebugLog {
+    private static var lines = 0
+    private static let url = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/Dynamic Island Debug.log")
+
+    static func write(_ message: String) {
+        guard lines < 400 else { return }
+        lines += 1
+        let line = "\(Date().formatted(.iso8601)) \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
     }
 }
