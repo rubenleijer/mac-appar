@@ -51,10 +51,37 @@ struct HubTaskDetail: Equatable {
 }
 
 /// A running focus timer on a task. Kept on this Mac; the Hub has no timer tool yet.
+/// The running (or paused) timer. When the Hub has timer tools this mirrors its timer, so the
+/// time lands in the Hub; otherwise it's kept on this Mac only.
 struct HubTimer: Codable, Equatable {
     var taskID: String
     var title: String
+    /// When the timer would have started had it never paused – elapsed = now − start.
     var start: Date
+    /// Set while paused: the time on the clock.
+    var pausedElapsed: TimeInterval?
+    /// True when this is the Hub's own timer.
+    var isHub: Bool?
+
+    var isPaused: Bool { pausedElapsed != nil }
+
+    func elapsed(at now: Date) -> TimeInterval {
+        pausedElapsed ?? max(now.timeIntervalSince(start), 0)
+    }
+}
+
+extension HubTimer {
+    /// Reads the Hub's ActiveTimerDto (`get_active_timer`, `start_timer`, …).
+    init?(hub json: [String: Any], now: Date = Date()) {
+        guard let taskID = json["taskId"] as? String else { return nil }
+        let elapsedMs = (json["elapsedMs"] as? NSNumber)?.doubleValue ?? 0
+        let paused = json["isPaused"] as? Bool ?? false
+        self.init(taskID: taskID,
+                  title: json["taskTitle"] as? String ?? "Task",
+                  start: now.addingTimeInterval(-elapsedMs / 1000),
+                  pausedElapsed: paused ? elapsedMs / 1000 : nil,
+                  isHub: true)
+    }
 }
 
 struct HubEvent: Identifiable, Equatable {

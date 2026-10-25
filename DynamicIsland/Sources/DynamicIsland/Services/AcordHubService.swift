@@ -307,6 +307,7 @@ final class AcordHubService {
                 clientNames = names
             }
 
+            await syncHubTime()
             now = Date()
             lastUpdated = now
             status = .ready
@@ -467,21 +468,95 @@ final class AcordHubService {
 
     // MARK: Timer
 
+    /// Whether the Hub's MCP has the timer tools (`start_timer`, …). Until it does, the timer
+    /// runs on this Mac only.
+    private(set) var hubTimeTools: Bool?
+    /// Time logged today in the Hub, from `list_time_entries`.
+    private(set) var loggedToday: TimeInterval?
+
+    private var canUseHubTime: Bool { hubTimeTools == true && !settings.memberID.isEmpty }
+
     func startTimer(_ task: HubTask) {
-        if timer != nil { stopTimer(silently: true) }
-        timer = HubTimer(taskID: task.id, title: task.title, start: Date())
-        saveTimer()
         if settings.timerStartsTask, task.status != HubTaskStatus.inProgress.rawValue { setStatus(task, "IN_PROGRESS") }
+        guard canUseHubTime else {
+            if timer != nil { stopTimer(silently: true) }
+            timer = HubTimer(taskID: task.id, title: task.title, start: Date())
+            saveTimer()
+            return
+        }
+        let previous = timer
+        timer = HubTimer(taskID: task.id, title: task.title, start: Date(), isHub: true) // show it at once
+        Task {
+            let data = await perform("start_timer", ["user_id": .string(settings.memberID), "task_id": .string(task.id),
+                                                    "force": .bool(true)], busy: task.id)
+            guard let data, let json = Self.object(data) else {
+                timer = previous
+                return
+            }
+            if let dto = json["timer"] as? [String: Any], let hubTimer = HubTimer(hub: dto) { timer = hubTimer }
+            if previous != nil, previous?.taskID != task.id { refreshTimeToday() }
+        }
     }
 
-    func stopTimer(silently: Bool = false) {
-        guard let timer else { return }
-        let elapsed = Date().timeIntervalSince(timer.start)
-        trackedTime[timer.taskID, default: 0] += elapsed
-        defaults.set(trackedTime, forKey: Self.trackedKey)
-        self.timer = nil
-        saveTimer()
-        if !silently { showToast("Tracked \(Self.durationText(elapsed)) on \(timer.title)") }
+    func stopTimer(silently: Bool = false, completeTask: Bool = false) {
+        guard let current = timer else { return }
+        guard current.isHub == true, canUseHubTime else {
+            let elapsed = current.elapsed(at: Date())
+            trackedTime[current.taskID, default: 0] += elapsed
+            defaults.set(trackedTime, forKey: Self.trackedKey)
+            timer = nil
+            saveTimer()
+            if !silently { showToast("Tracked \(Self.durationText(elapsed)) on \(current.title) – on this Mac only") }
+            return
+        }
+        timer = nil
+        Task {
+            var arguments: [String: HubArgument] = ["user_id": .string(settings.memberID)]
+            if completeTask { arguments["complete_task"] = .bool(true) }
+            guard let data = await perform("stop_timer", arguments, busy: current.taskID) else {
+                timer = current
+                return
+            }
+            let json = Self.object(data)
+            if !silently {
+                let logged = (json?["logged_ms"] as? NSNumber).map { $0.doubleValue / 1000 } ?? current.elapsed(at: Date())
+                showToast("Logged \(Self.durationText(logged)) on \(current.title)")
+            }
+            refreshTimeToday()
+            if completeTask { refresh(force: true) }
+        }
+    }
+
+    func pauseTimer() {
+        guard var current = timer, !current.isPaused else { return }
+        let elapsed = current.elapsed(at: Date())
+        current.pausedElapsed = elapsed
+        timer = current
+        guard current.isHub == true, canUseHubTime else { return saveTimer() }
+        Task {
+            if let data = await perform("pause_timer", ["user_id": .string(settings.memberID)], busy: current.taskID) {
+                if let dto = Self.object(data)?["timer"] as? [String: Any], let hubTimer = HubTimer(hub: dto) { timer = hubTimer }
+                showToast("Paused – \(Self.durationText(elapsed)) logged")
+                refreshTimeToday()
+            } else {
+                current.pausedElapsed = nil
+                timer = current
+            }
+        }
+    }
+
+    func resumeTimer() {
+        guard var current = timer, let elapsed = current.pausedElapsed else { return }
+        current.pausedElapsed = nil
+        current.start = Date().addingTimeInterval(-elapsed)
+        timer = current
+        guard current.isHub == true, canUseHubTime else { return saveTimer() }
+        Task {
+            if let data = await perform("resume_timer", ["user_id": .string(settings.memberID)], busy: current.taskID),
+               let dto = Self.object(data)?["timer"] as? [String: Any], let hubTimer = HubTimer(hub: dto) {
+                timer = hubTimer
+            }
+        }
     }
 
     func cancelTimer() {
@@ -490,14 +565,65 @@ final class AcordHubService {
     }
 
     func toggleTimer(_ task: HubTask) {
-        if timer?.taskID == task.id { stopTimer() } else { startTimer(task) }
+        guard let timer, timer.taskID == task.id else { return startTimer(task) }
+        if timer.isPaused { resumeTimer() } else { stopTimer() }
     }
 
-    /// Time tracked on a task with the island's timer, including a running timer.
+    /// Logs time without a timer – on a task, straight into the Hub.
+    func logTime(_ minutes: Int, on task: HubTask, note: String? = nil) {
+        guard canUseHubTime else {
+            trackedTime[task.id, default: 0] += TimeInterval(minutes * 60)
+            defaults.set(trackedTime, forKey: Self.trackedKey)
+            showToast("Logged \(Self.durationText(TimeInterval(minutes * 60))) – on this Mac only")
+            return
+        }
+        Task {
+            var arguments: [String: HubArgument] = ["user_id": .string(settings.memberID), "task_id": .string(task.id),
+                                                    "minutes": .int(minutes)]
+            if let note, !note.isEmpty { arguments["note"] = .string(note) }
+            guard await perform("log_time", arguments, busy: task.id) != nil else { return }
+            showToast("Logged \(Self.durationText(TimeInterval(minutes * 60))) on \(task.title)")
+            refreshTimeToday()
+        }
+    }
+
+    /// Time tracked on a task: the running timer here, plus anything kept on this Mac.
     func timeTracked(on id: String, now: Date) -> TimeInterval {
         var total = trackedTime[id] ?? 0
-        if let timer, timer.taskID == id { total += now.timeIntervalSince(timer.start) }
+        if let timer, timer.taskID == id { total += timer.elapsed(at: now) }
         return total
+    }
+
+    /// Picks up the Hub's timer (also one started in the browser) and today's total.
+    private func syncHubTime() async {
+        guard !settings.memberID.isEmpty else { return }
+        let me = settings.memberID
+        do {
+            let data = try await client.call("get_active_timer", ["user_id": .string(me)])
+            hubTimeTools = true
+            let dto = Self.object(data)?["timer"] as? [String: Any]
+            let hubTimer = dto.flatMap { HubTimer(hub: $0) }
+            // Keep a local timer if the Hub has none; otherwise the Hub decides.
+            if hubTimer != nil || timer?.isHub == true { timer = hubTimer }
+        } catch {
+            let message = (error as? LocalizedError)?.errorDescription ?? ""
+            if message.localizedCaseInsensitiveContains("not found") || message.localizedCaseInsensitiveContains("unknown tool") {
+                hubTimeTools = false
+            }
+            return
+        }
+        if let data = try? await client.call("list_time_entries", ["user_id": .string(me)]),
+           let minutes = (Self.object(data)?["total_minutes"] as? NSNumber)?.doubleValue {
+            loggedToday = minutes * 60
+        }
+    }
+
+    private func refreshTimeToday() {
+        Task { await syncHubTime() }
+    }
+
+    private static func object(_ data: Data) -> [String: Any]? {
+        try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     private func saveTimer() {

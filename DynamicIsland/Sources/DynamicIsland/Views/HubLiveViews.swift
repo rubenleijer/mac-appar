@@ -111,8 +111,8 @@ struct CompactHubView: View {
         case .overdue:
             return "\(item.count)"
         case .timer:
-            guard let start = item.date else { return "" }
-            return clockText(now.timeIntervalSince(start))
+            guard let timer = model.hub.timer else { return "" }
+            return clockText(timer.elapsed(at: now))
         case .ongoingEvent:
             guard let end = item.date else { return "Now" }
             return shortDuration(end.timeIntervalSince(now))

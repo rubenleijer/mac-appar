@@ -43,8 +43,16 @@ struct HubTaskRow: View {
 
             HStack(spacing: 4) {
                 if isTiming {
-                    TimerChip(taskID: task.id) { hub.toggleTimer(task) }
+                    TimerChip(taskID: task.id) { hub.timer?.isPaused == true ? hub.resumeTimer() : hub.pauseTimer() }
                         .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    if isHovering {
+                        Button { hub.stopTimer() } label: {
+                            Image(systemName: "stop.fill").font(.system(size: 10, weight: .bold))
+                        }
+                        .buttonStyle(IslandButtonStyle(diameter: 24))
+                        .help("Stop and log the time")
+                        .transition(.opacity)
+                    }
                 } else if isHovering {
                     Button { hub.toggleTimer(task) } label: {
                         Image(systemName: "play.fill").font(.system(size: 10, weight: .bold))
@@ -53,7 +61,15 @@ struct HubTaskRow: View {
                     .help("Start a timer")
                     .transition(.opacity)
                 }
-                if isHovering {
+                if isHovering && !isTiming {
+                    Button { LogTimeChoice.showMenu(task: task, hub: hub) } label: {
+                        Image(systemName: "clock.badge.checkmark").font(.system(size: 10.5, weight: .semibold))
+                    }
+                    .buttonStyle(IslandButtonStyle(diameter: 24))
+                    .help("Log time")
+                    .transition(.opacity)
+                }
+                if isHovering && !isTiming {
                     Button { hub.delete(task) } label: {
                         Image(systemName: "trash").font(.system(size: 10.5, weight: .semibold))
                     }
@@ -246,12 +262,17 @@ private struct TimerChip: View {
     @Environment(IslandModel.self) private var model
     @State private var isHovering = false
 
+    private var isPaused: Bool { model.hub.timer?.isPaused == true }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                Image(systemName: isHovering ? "stop.fill" : "play.fill").font(.system(size: 9, weight: .bold))
+                Image(systemName: isPaused ? "play.fill" : (isHovering ? "pause.fill" : "record.circle"))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(isPaused ? Color.orange : (isHovering ? Color.white : Color.green))
+                    .symbolEffect(.pulse, isActive: !isPaused && !isHovering)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(clockText(model.hub.timeTracked(on: taskID, now: context.date)))
+                    Text(clockText(model.hub.timer?.elapsed(at: context.date) ?? 0))
                         .font(.system(size: 11, weight: .semibold).monospacedDigit())
                 }
             }
@@ -263,7 +284,7 @@ private struct TimerChip: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .help("Stop the timer")
+        .help(isPaused ? "Resume the timer" : "Pause the timer")
     }
 }
 
@@ -285,7 +306,20 @@ private struct TaskMenuItems: View {
         Button(task.status == HubTaskStatus.inProgress.rawValue ? "Move Back to To Do" : "Mark as In Progress") {
             hub.toggleInProgress(task)
         }
-        Button(hub.timer?.taskID == task.id ? "Stop Timer" : "Start Timer") { hub.toggleTimer(task) }
+        if let timer = hub.timer, timer.taskID == task.id {
+            Button(timer.isPaused ? "Resume Timer" : "Pause Timer") { timer.isPaused ? hub.resumeTimer() : hub.pauseTimer() }
+            Button("Stop Timer and Log") { hub.stopTimer() }
+            Button("Stop Timer and Mark as Done") { hub.stopTimer(completeTask: true) }
+        } else {
+            Button("Start Timer") { hub.startTimer(task) }
+        }
+        Menu("Log Time") {
+            ForEach(LogTimeChoice.minutes, id: \.self) { minutes in
+                Button(LogTimeChoice.title(minutes)) { hub.logTime(minutes, on: task) }
+            }
+            Divider()
+            Button("Other…") { LogTimeChoice.askCustom(task: task, hub: hub) }
+        }
         Divider()
         Menu("Due") {
             ForEach(DueChoice.allCases) { choice in
@@ -423,13 +457,21 @@ struct HubTaskDetailView: View {
         return HStack(spacing: 6) {
             Chip(title: "Done", symbol: "checkmark", tint: .green, filled: true) { hub.complete(task) }
             TimelineView(.periodic(from: .now, by: 1)) { context in
-                let tracked = hub.timeTracked(on: task.id, now: context.date)
-                Chip(title: isTiming ? clockText(tracked) : (tracked > 0 ? "Timer · \(clockText(tracked))" : "Start timer"),
-                     symbol: isTiming ? "stop.fill" : "play.fill", tint: isTiming ? .green : .white, monospaced: true) {
-                    hub.toggleTimer(task)
+                let elapsed = hub.timer.map { $0.elapsed(at: context.date) } ?? 0
+                if isTiming, let timer = hub.timer {
+                    HStack(spacing: 4) {
+                        Chip(title: clockText(elapsed), symbol: timer.isPaused ? "play.fill" : "pause.fill",
+                             tint: timer.isPaused ? .orange : .green, monospaced: true) {
+                            timer.isPaused ? hub.resumeTimer() : hub.pauseTimer()
+                        }
+                        Chip(title: "Stop", symbol: "stop.fill", tint: .white) { hub.stopTimer() }
+                    }
+                } else {
+                    Chip(title: "Start timer", symbol: "play.fill", tint: .white) { hub.startTimer(task) }
                 }
             }
             .fixedSize()
+            Chip(title: "Log", symbol: "clock.badge.checkmark", tint: .white) { LogTimeChoice.showMenu(task: task, hub: hub) }
             Chip(title: "Edit", symbol: "pencil", tint: .white) { model.onEditTask?(task, false) }
             Chip(title: "Item", symbol: "plus", tint: .white) { model.onEditTask?(task, true) }
             Spacer(minLength: 0)
@@ -592,5 +634,65 @@ enum IslandMenu {
             }
         }
         _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+}
+
+/// Quick amounts for logging time on a task without a timer.
+@MainActor
+enum LogTimeChoice {
+    static let minutes = [15, 30, 45, 60, 90, 120]
+
+    static func title(_ minutes: Int) -> String {
+        minutes < 60 ? "\(minutes) min" : (minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min")
+    }
+
+    static func showMenu(task: HubTask, hub: AcordHubService) {
+        var entries: [IslandMenu.Entry] = minutes.map { amount in
+            IslandMenu.Entry.item("Log " + title(amount), checked: false, action: { hub.logTime(amount, on: task) })
+        }
+        entries.append(.separator)
+        entries.append(.item("Other…", checked: false, action: { askCustom(task: task, hub: hub) }))
+        IslandMenu.show(entries)
+    }
+
+    /// Asks for minutes (or "1:30", "1.5h") and an optional note.
+    static func askCustom(task: HubTask, hub: AcordHubService) {
+        let alert = NSAlert()
+        alert.messageText = "Log time on “\(task.title)”"
+        alert.informativeText = "Minutes, or hours like 1:30 or 1.5h."
+        let amount = NSTextField(string: "")
+        amount.placeholderString = "30"
+        let note = NSTextField(string: "")
+        note.placeholderString = "Note (optional)"
+        let stack = NSStackView(views: [amount, note])
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 260, height: 54)
+        amount.frame.size.width = 260
+        note.frame.size.width = 260
+        alert.accessoryView = stack
+        alert.addButton(withTitle: "Log")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = amount
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn, let minutes = parse(amount.stringValue) else { return }
+        hub.logTime(minutes, on: task, note: note.stringValue)
+    }
+
+    static func parse(_ text: String) -> Int? {
+        let value = text.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: ",", with: ".")
+        if value.contains(":") {
+            let parts = value.split(separator: ":").compactMap { Int($0) }
+            guard parts.count == 2 else { return nil }
+            let total = parts[0] * 60 + parts[1]
+            return total > 0 ? total : nil
+        }
+        if value.hasSuffix("h") || value.hasSuffix("t"), let hours = Double(value.dropLast().trimmingCharacters(in: .whitespaces)) {
+            let total = Int((hours * 60).rounded())
+            return total > 0 ? total : nil
+        }
+        let digits = value.replacingOccurrences(of: "min", with: "").replacingOccurrences(of: "m", with: "").trimmingCharacters(in: .whitespaces)
+        guard let minutes = Int(digits), minutes > 0 else { return nil }
+        return minutes
     }
 }

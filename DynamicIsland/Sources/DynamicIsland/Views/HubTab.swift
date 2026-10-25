@@ -64,6 +64,14 @@ struct HubTab: View {
                 }
             }
             Spacer(minLength: 4)
+            if showsTitles, currentSection == .tasks, let logged = hub.loggedToday, logged > 0 {
+                Label(AcordHubService.durationText(logged), systemImage: "clock")
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.55))
+                    .labelStyle(.titleAndIcon)
+                    .fixedSize()
+                    .help("Logged in Acord Hub today")
+            }
             if currentSection == .tasks && hub.selectedTaskID == nil {
                 TodayToggle(isOn: hub.settings.showsTodayOnly) {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { hub.settings.showsTodayOnly.toggle() }
