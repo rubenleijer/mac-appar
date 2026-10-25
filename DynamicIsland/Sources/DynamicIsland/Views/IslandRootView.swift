@@ -37,15 +37,7 @@ struct IslandRootView: View {
     @ViewBuilder
     private func content(for presentation: IslandPresentation) -> some View {
         ZStack(alignment: .top) {
-            if model.showsThermalStrip && presentation != .thermalCompact {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    ThermalStrip()
-                        .padding(.horizontal, model.earRadius)
-                        .padding(.bottom, 2)
-                }
-                .transition(.opacity)
-            }
+
             switch presentation {
             case .closed:
                 Color.clear

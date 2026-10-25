@@ -85,41 +85,31 @@ private struct Sparkline: View {
     }
 }
 
-/// A slim pill just below the camera: temperature on the left, the time in the middle and the
-/// battery on the right, all on one line. (The middle of the notch itself has no pixels.)
+/// Beside the notch: temperature on the left, battery on the right, on the camera's line.
 struct CompactThermalView: View {
     @Environment(IslandModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 0) {
-            Color.clear.frame(height: model.notch.height)
-            ThermalStrip()
-            Spacer(minLength: 0)
+        let thermal = model.thermal
+        HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                temperature
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 12)
+            .frame(width: model.thermalSideWidth)
+
+            Color.clear.frame(width: model.notch.width)
+
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                if let battery = thermal.battery { batteryLabel(battery) }
+            }
+            .padding(.trailing, 12)
+            .frame(width: model.thermalSideWidth)
         }
         .padding(.horizontal, model.earRadius)
-    }
-}
-
-/// Temperature, time and battery on one line. Also hangs under music and other live activities.
-struct ThermalStrip: View {
-    @Environment(IslandModel.self) private var model
-
-    var body: some View {
-        let thermal = model.thermal
-        VStack(spacing: 0) {
-            ZStack {
-                if model.settings.showClockInNotch {
-                    NotchClock()
-                }
-                HStack(spacing: 0) {
-                    temperature
-                    Spacer(minLength: 8)
-                    if let battery = thermal.battery { batteryLabel(battery) }
-                }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: IslandLayout.thermalStripHeight - 4)
-        }
+        .frame(height: model.notch.height)
         .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
         .animation(.easeInOut(duration: 0.4), value: thermal.battery)
     }
@@ -148,39 +138,6 @@ struct ThermalStrip: View {
         }
         .foregroundStyle(BatteryBadge.color(battery))
         .fixedSize()
-    }
-}
-
-/// "17:59" in a rounded heavy face with a soft glow; the colon blinks and digits roll on change.
-private struct NotchClock: View {
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let components = Calendar.current.dateComponents([.hour, .minute, .second], from: context.date)
-            let hours = String(format: "%02d", components.hour ?? 0)
-            let minutes = String(format: "%02d", components.minute ?? 0)
-            let tick = (components.second ?? 0) % 2 == 0
-            HStack(spacing: 1) {
-                digits(hours)
-                Text(":")
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .opacity(tick ? 0.95 : 0.25)
-                    .offset(y: -1)
-                    .animation(.easeInOut(duration: 0.45), value: tick)
-                digits(minutes)
-            }
-            .shadow(color: .white.opacity(0.22), radius: 4)
-            .help(context.date.formatted(date: .complete, time: .shortened))
-        }
-        .fixedSize()
-    }
-
-    private func digits(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 15, weight: .heavy, design: .rounded).monospacedDigit())
-            .foregroundStyle(LinearGradient(colors: [.white, Color(white: 0.72)], startPoint: .top, endPoint: .bottom))
-            .contentTransition(.numericText(countsDown: false))
-            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: text)
     }
 }
 

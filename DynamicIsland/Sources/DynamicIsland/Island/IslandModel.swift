@@ -52,8 +52,6 @@ enum IslandLayout {
     static let maxHubRows = 5
     static let trayContentHeight: CGFloat = 148
     static let temperatureRowHeight: CGFloat = 40
-    static let notchClockHeight: CGFloat = 20
-    static let thermalStripHeight: CGFloat = 26
 }
 
 @MainActor @Observable
@@ -157,7 +155,7 @@ final class IslandModel {
         case .open: .spring(response: 0.42, dampingFraction: 0.74)
         // States that are exactly notch-high must not overshoot on the way in: a bouncy spring
         // dips below the hardware notch for a moment and the real notch peeks out underneath.
-        case .closed, .compact, .postureCompact, .hubCompact, .hud(.volume), .hud(.brightness):
+        case .closed, .compact, .postureCompact, .hubCompact, .thermalCompact, .hud(.volume), .hud(.brightness):
             .spring(response: 0.4, dampingFraction: 1)
         default: .spring(response: 0.48, dampingFraction: 0.68)
         }
@@ -169,21 +167,9 @@ final class IslandModel {
 
     var compactSideWidth: CGFloat { notch.height + 4 }
     var hudSideWidth: CGFloat { 66 }
-    /// Temperature, time and battery hang under music, meetings and posture too, when turned on.
-    var showsThermalStrip: Bool {
-        guard settings.showTemperatureLiveActivity, thermal.isAvailable else { return false }
-        switch presentation {
-        case .compact, .hubCompact, .postureCompact, .thermalCompact: return true
-        default: return false
-        }
-    }
-
-    /// The narrowest island the strip fits in.
-    private var thermalStripWidth: CGFloat { notch.width + thermalSideWidth * 2 + earRadius * 2 }
-
     /// Width of each side of the temperature activity. Both sides match: the island is centred
     /// on the camera, so lopsided sides would slide content under the notch.
-    var thermalSideWidth: CGFloat { 18 }
+    var thermalSideWidth: CGFloat { 70 }
 
     /// Width of the concave "ears" that blend the island into the top edge.
     var earRadius: CGFloat {
@@ -198,9 +184,7 @@ final class IslandModel {
     var bottomRadius: CGFloat {
         switch presentation {
         case .closed: isHovering ? 12 : 8
-        case .thermalCompact: 18
-        case .compact, .postureCompact, .hubCompact: showsThermalStrip ? 18 : 13
-        case .hud(.volume), .hud(.brightness): 13
+        case .compact, .postureCompact, .hubCompact, .thermalCompact, .hud(.volume), .hud(.brightness): 13
         case .peek, .hud(.outputDevice): 22
         case .postureAlert, .hubAlert, .thermalAlert: 24
         case .open: 32
@@ -211,12 +195,6 @@ final class IslandModel {
     var openWidth: CGFloat { showsHubTab ? max(notch.width + 400, 560) : max(notch.width + 340, 500) }
 
     var size: CGSize {
-        let base = baseSize
-        guard showsThermalStrip, presentation != .thermalCompact else { return base }
-        return CGSize(width: max(base.width, thermalStripWidth), height: base.height + IslandLayout.thermalStripHeight)
-    }
-
-    private var baseSize: CGSize {
         let ears = earRadius * 2
         switch presentation {
         case .closed:
@@ -231,8 +209,7 @@ final class IslandModel {
         case .hubCompact:
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .thermalCompact:
-            // A pill hanging just below the camera: temperature, time and battery on one line.
-            return CGSize(width: notch.width + thermalSideWidth * 2 + ears, height: notch.height + IslandLayout.thermalStripHeight)
+            return CGSize(width: notch.width + thermalSideWidth * 2 + ears, height: notch.height)
         case .thermalAlert:
             return CGSize(width: notch.width + 260 + ears, height: notch.height + 64)
         case .hud(.volume), .hud(.brightness):
