@@ -70,23 +70,29 @@ final class AudioService {
 
     // MARK: Volume
 
-    func setVolume(_ value: Double) {
+    @discardableResult
+    func setVolume(_ value: Double) -> Bool {
         let value = min(max(value, 0), 1)
         ignoreChangesUntil = Date().addingTimeInterval(0.4)
         var scalar = Float32(value)
-        if Self.set(currentDeviceID, kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioDevicePropertyScopeOutput, &scalar) {
-            volume = value
-        }
+        let succeeded = Self.set(currentDeviceID, kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+                                 scope: kAudioDevicePropertyScopeOutput, &scalar)
+        if succeeded { volume = value }
         // Like the system: dragging the volume up unmutes, down to zero mutes.
         if isMuted && value > 0 { setMuted(false) }
+        return succeeded
     }
 
     /// Steps the volume the way the keyboard does (1/16, or 1/64 with ⌥⇧).
-    func stepVolume(by steps: Int, fine: Bool) {
+    /// Returns false when the device refused, so the key can go to the system instead.
+    @discardableResult
+    func stepVolume(by steps: Int, fine: Bool) -> Bool {
+        readVolume()
         let divisions = fine ? 64.0 : 16.0
-        let target = ((volume * divisions).rounded() + Double(steps)) / divisions
-        setVolume(target)
+        let target = min(max(((volume * divisions).rounded() + Double(steps)) / divisions, 0), 1)
+        let succeeded = setVolume(target)
         if target <= 0 { setMuted(true) }
+        return succeeded || target <= 0
     }
 
     func setMuted(_ muted: Bool) {

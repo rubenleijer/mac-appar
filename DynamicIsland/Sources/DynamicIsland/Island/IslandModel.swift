@@ -375,8 +375,8 @@ final class IslandModel {
         case .volumeUp, .volumeDown, .mute:
             guard audio.canSetVolume else { return false }
             switch key {
-            case .volumeUp: audio.stepVolume(by: 1, fine: fine)
-            case .volumeDown: audio.stepVolume(by: -1, fine: fine)
+            case .volumeUp: guard audio.stepVolume(by: 1, fine: fine) else { return false }
+            case .volumeDown: guard audio.stepVolume(by: -1, fine: fine) else { return false }
             default: audio.toggleMute()
             }
             showHUD(.volume)

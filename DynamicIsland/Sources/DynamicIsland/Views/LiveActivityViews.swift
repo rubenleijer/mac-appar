@@ -98,7 +98,7 @@ private struct LevelBar: View {
                     .frame(width: geometry.size.width * CGFloat(min(max(level, 0), 1)))
             }
         }
-        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: level)
+        .animation(.easeInOut(duration: 0.24), value: level)
     }
 }
 
