@@ -12,6 +12,10 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/arm64-apple-macosx/$CONFIG/DynamicIsland" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+cp Scripts/update.sh "$APP/Contents/Resources/"
+# The commit this was built from, so the app can tell when an update is out.
+COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+/usr/libexec/PlistBuddy -c "Add :DIGitCommit string $COMMIT" "$APP/Contents/Info.plist" >/dev/null 2>&1 || true
 
 clang -fobjc-arc -O2 -dynamiclib -mmacosx-version-min=14.0 -framework Foundation \
     -o "$APP/Contents/Resources/libNowPlayingBridge.dylib" Bridge/NowPlayingBridge.m

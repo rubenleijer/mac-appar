@@ -33,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onOpenSettings = { [weak settingsWindow] in settingsWindow?.show() }
         let quickAddWindow = QuickAddTaskController(model: model)
         model.onQuickAddTask = { [weak quickAddWindow] in quickAddWindow?.show() }
+        let updates = UpdateService(settings: settings)
+        updates.canInstallNow = { [weak model] in model.map { !$0.isOpen } ?? true }
+        model.updates = updates
         let taskEditor = TaskEditorController(model: model)
         model.onEditTask = { [weak taskEditor] task, checklist in taskEditor?.show(task, focusChecklist: checklist) }
 
@@ -47,7 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #else
         let isRenderingSnapshots = false
         #endif
-        if !isRenderingSnapshots { hub.start() }
+        if !isRenderingSnapshots {
+            hub.start()
+            updates.start()
+        }
 
         self.model = model
         self.islandWindow = islandWindow

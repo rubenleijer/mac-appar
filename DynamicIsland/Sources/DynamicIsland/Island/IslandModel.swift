@@ -65,6 +65,7 @@ final class IslandModel {
     var tab: IslandTab = .media
 
     @ObservationIgnored var onOpenSettings: (() -> Void)?
+    @ObservationIgnored var updates: UpdateService?
     @ObservationIgnored var onQuickAddTask: (() -> Void)?
     /// Opens the task editor; `true` focuses a new checklist item.
     @ObservationIgnored var onEditTask: ((HubTask, Bool) -> Void)?
@@ -104,7 +105,7 @@ final class IslandModel {
             self?.handleKey(key, fine: fine) ?? false
         }
         settings.onReplaceSystemHUDChange = { [weak self] in self?.updateKeyInterception(requestPermission: true) }
-        updateKeyInterception(requestPermission: false)
+        updateKeyInterception(requestPermission: settings.replaceSystemHUD && !MediaKeyInterceptor.hasPermission)
     }
 
     // MARK: Presentation

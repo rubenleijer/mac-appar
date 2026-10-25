@@ -135,6 +135,10 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let updates = model.updates {
+                UpdatesSection(updates: updates)
+            }
+
             Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -202,5 +206,56 @@ final class SettingsWindowController {
         }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
+    }
+}
+
+private struct UpdatesSection: View {
+    let updates: UpdateService
+    @Environment(IslandModel.self) private var model
+
+    var body: some View {
+        @Bindable var settings = model.settings
+        Section {
+            Toggle("Check for updates automatically", isOn: $settings.autoUpdate)
+            Toggle("Install updates automatically", isOn: $settings.autoInstallUpdates)
+                .disabled(!settings.autoUpdate)
+            HStack {
+                status
+                Spacer()
+                switch updates.state {
+                case .available:
+                    Button("Install Now") { updates.install() }
+                case .installing, .checking:
+                    ProgressView().controlSize(.small)
+                default:
+                    Button("Check Now") { Task { await updates.check() } }
+                }
+            }
+            HStack {
+                TextField("Repository", text: $settings.updateRepository)
+                TextField("Branch", text: $settings.updateBranch).frame(width: 110)
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text("Updates are built on this Mac from GitHub and installed in Applications – the island relaunches by itself. Build \(updates.shortCommit).")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        switch updates.state {
+        case .idle: Text("Not checked yet").foregroundStyle(.secondary)
+        case .checking: Text("Checking…").foregroundStyle(.secondary)
+        case .upToDate: Label("Up to date", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case .available(let message): Label("Update: \(message)", systemImage: "arrow.down.circle.fill").foregroundStyle(.blue).lineLimit(1)
+        case .installing: Text("Building the update – the island restarts when it’s done").foregroundStyle(.secondary)
+        case .failed(let message):
+            HStack {
+                Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).lineLimit(2)
+                Button("Log") { updates.openLog() }
+            }
+        }
     }
 }
