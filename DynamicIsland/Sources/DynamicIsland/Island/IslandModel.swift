@@ -165,8 +165,9 @@ final class IslandModel {
 
     var compactSideWidth: CGFloat { notch.height + 4 }
     var hudSideWidth: CGFloat { 66 }
-    /// Room for "52°" or "82%" with its icon, on each side of the notch.
-    var thermalSideWidth: CGFloat { settings.showClockInNotch ? 96 : 64 }
+    /// Room for "52°" left of the notch, and the time and "82%" right of it.
+    var thermalLeftWidth: CGFloat { 64 }
+    var thermalRightWidth: CGFloat { settings.showClockInNotch ? 124 : 64 }
 
     /// Width of the concave "ears" that blend the island into the top edge.
     var earRadius: CGFloat {
@@ -206,7 +207,7 @@ final class IslandModel {
         case .hubCompact:
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .thermalCompact:
-            return CGSize(width: notch.width + (thermalSideWidth + 10) * 2 + ears, height: notch.height)
+            return CGSize(width: notch.width + thermalLeftWidth + thermalRightWidth + 20 + ears, height: notch.height)
         case .thermalAlert:
             return CGSize(width: notch.width + 260 + ears, height: notch.height + 64)
         case .hud(.volume), .hud(.brightness):

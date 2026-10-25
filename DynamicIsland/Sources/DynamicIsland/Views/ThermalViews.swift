@@ -85,9 +85,8 @@ private struct Sparkline: View {
     }
 }
 
-/// Beside the notch: temperature on the far left, battery on the far right, and the time split
-/// around the camera – hours against the notch's left edge, minutes against its right – with a
-/// pulse ticking the seconds on either side.
+/// Beside the notch: temperature on the left; on the right, the time right after the camera
+/// and the battery at the far end. The colon blinks with the seconds.
 struct CompactThermalView: View {
     @Environment(IslandModel.self) private var model
 
@@ -95,93 +94,75 @@ struct CompactThermalView: View {
         let thermal = model.thermal
         let color = ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold)
         let showsClock = model.settings.showClockInNotch
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let parts = Self.clockParts(context.date)
+        HStack(spacing: 0) {
+            HStack(spacing: 3) {
+                Image(systemName: "thermometer.medium").font(.system(size: 11, weight: .semibold))
+                Text(thermal.cpuText)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .contentTransition(.numericText())
+            }
+            .foregroundStyle(color)
+            .frame(width: model.thermalLeftWidth)
+            .padding(.leading, 10)
+
+            Spacer(minLength: model.notch.width)
+
             HStack(spacing: 0) {
-                // Left wing
-                HStack(spacing: 0) {
+                if showsClock {
+                    NotchClock()
+                        .padding(.leading, 8)
+                }
+                Spacer(minLength: 8)
+                if let battery = thermal.battery {
                     HStack(spacing: 3) {
-                        Image(systemName: "thermometer.medium").font(.system(size: 11, weight: .semibold))
-                        Text(thermal.cpuText)
+                        Text("\(battery.percent)%")
                             .font(.system(size: 12, weight: .semibold).monospacedDigit())
                             .contentTransition(.numericText())
+                        Image(systemName: battery.symbol).font(.system(size: 12, weight: .semibold))
                     }
-                    .foregroundStyle(color)
-                    Spacer(minLength: 6)
-                    if showsClock {
-                        ClockDigits(text: parts.hours)
-                        SecondPulse(date: context.date, alignment: .trailing)
-                    }
+                    .foregroundStyle(BatteryBadge.color(battery))
                 }
-                .frame(width: model.thermalSideWidth)
-                .padding(.leading, 10)
-
-                // The camera
-                Spacer(minLength: model.notch.width)
-
-                // Right wing
-                HStack(spacing: 0) {
-                    if showsClock {
-                        SecondPulse(date: context.date, alignment: .leading)
-                        ClockDigits(text: parts.minutes)
-                    }
-                    Spacer(minLength: 6)
-                    if let battery = thermal.battery {
-                        HStack(spacing: 3) {
-                            Text("\(battery.percent)%")
-                                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                                .contentTransition(.numericText())
-                            Image(systemName: battery.symbol).font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundStyle(BatteryBadge.color(battery))
-                    }
-                }
-                .frame(width: model.thermalSideWidth)
-                .padding(.trailing, 10)
             }
-            .padding(.horizontal, model.earRadius)
-            .frame(height: model.notch.height)
-            .help(context.date.formatted(date: .complete, time: .shortened))
+            .frame(width: model.thermalRightWidth)
+            .padding(.trailing, 10)
         }
+        .padding(.horizontal, model.earRadius)
+        .frame(height: model.notch.height)
         .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
         .animation(.easeInOut(duration: 0.4), value: thermal.battery)
     }
-
-    static func clockParts(_ date: Date) -> (hours: String, minutes: String) {
-        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-        return (String(format: "%02d", components.hour ?? 0), String(format: "%02d", components.minute ?? 0))
-    }
 }
 
-/// Hours or minutes in a rounded, slightly glowing face, rolling when they change.
-private struct ClockDigits: View {
-    let text: String
-
+/// "17:59" in a rounded heavy face with a soft glow; the colon blinks and digits roll on change.
+private struct NotchClock: View {
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let components = Calendar.current.dateComponents([.hour, .minute, .second], from: context.date)
+            let hours = String(format: "%02d", components.hour ?? 0)
+            let minutes = String(format: "%02d", components.minute ?? 0)
+            let tick = (components.second ?? 0) % 2 == 0
+            HStack(spacing: 1) {
+                digits(hours)
+                Text(":")
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .opacity(tick ? 0.95 : 0.25)
+                    .offset(y: -1)
+                    .animation(.easeInOut(duration: 0.45), value: tick)
+                digits(minutes)
+            }
+            .shadow(color: .white.opacity(0.22), radius: 4)
+            .help(context.date.formatted(date: .complete, time: .shortened))
+        }
+        .fixedSize()
+    }
+
+    private func digits(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 15, weight: .heavy, design: .rounded).monospacedDigit())
             .foregroundStyle(LinearGradient(colors: [.white, Color(white: 0.72)], startPoint: .top, endPoint: .bottom))
-            .shadow(color: .white.opacity(0.25), radius: 4)
             .contentTransition(.numericText(countsDown: false))
             .animation(.spring(response: 0.45, dampingFraction: 0.8), value: text)
-            .fixedSize()
-    }
-}
-
-/// The clock's colon, split in two: a dot on each side of the camera that fades every second.
-private struct SecondPulse: View {
-    let date: Date
-    let alignment: HorizontalAlignment
-
-    var body: some View {
-        let second = Calendar.current.component(.second, from: date)
-        Circle()
-            .fill(Color.white)
-            .frame(width: 3.5, height: 3.5)
-            .opacity(second % 2 == 0 ? 0.9 : 0.2)
-            .animation(.easeInOut(duration: 0.5), value: second)
-            .padding(alignment == .trailing ? .leading : .trailing, 4)
-            .padding(alignment == .trailing ? .trailing : .leading, 5)
     }
 }
 
