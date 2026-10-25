@@ -52,6 +52,7 @@ enum IslandLayout {
     static let maxHubRows = 5
     static let trayContentHeight: CGFloat = 148
     static let temperatureRowHeight: CGFloat = 40
+    static let notchClockHeight: CGFloat = 20
 }
 
 @MainActor @Observable
@@ -180,7 +181,8 @@ final class IslandModel {
     var bottomRadius: CGFloat {
         switch presentation {
         case .closed: isHovering ? 12 : 8
-        case .compact, .postureCompact, .hubCompact, .thermalCompact, .hud(.volume), .hud(.brightness): 13
+        case .thermalCompact: settings.showClockInNotch && metrics.hasNotch ? 16 : 13
+        case .compact, .postureCompact, .hubCompact, .hud(.volume), .hud(.brightness): 13
         case .peek, .hud(.outputDevice): 22
         case .postureAlert, .hubAlert, .thermalAlert: 24
         case .open: 32
@@ -205,7 +207,9 @@ final class IslandModel {
         case .hubCompact:
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .thermalCompact:
-            return CGSize(width: notch.width + (thermalSideWidth + 8) * 2 + ears, height: notch.height)
+            let clockBelow = settings.showClockInNotch && metrics.hasNotch
+            return CGSize(width: notch.width + (thermalSideWidth + 8) * 2 + ears,
+                          height: notch.height + (clockBelow ? IslandLayout.notchClockHeight : 0))
         case .thermalAlert:
             return CGSize(width: notch.width + 260 + ears, height: notch.height + 64)
         case .hud(.volume), .hud(.brightness):

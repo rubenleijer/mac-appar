@@ -16,6 +16,7 @@ final class AppSettings {
     var showTrayTab: Bool { didSet { store(showTrayTab, Key.showTrayTab) } }
     var showTemperature: Bool { didSet { store(showTemperature, Key.showTemperature) } }
     var showTemperatureLiveActivity: Bool { didSet { store(showTemperatureLiveActivity, Key.showTemperatureLiveActivity) } }
+    var showClockInNotch: Bool { didSet { store(showClockInNotch, Key.showClockInNotch) } }
     var warnWhenHot: Bool { didSet { store(warnWhenHot, Key.warnWhenHot) } }
     var hotThreshold: Int { didSet { defaults.set(hotThreshold, forKey: Key.hotThreshold) } }
     var autoUpdate: Bool { didSet { store(autoUpdate, Key.autoUpdate) } }
@@ -50,6 +51,7 @@ final class AppSettings {
         static let showTrayTab = "showTrayTab"
         static let showTemperature = "showTemperature"
         static let showTemperatureLiveActivity = "showTemperatureLiveActivity"
+        static let showClockInNotch = "showClockInNotch"
         static let warnWhenHot = "warnWhenHot"
         static let hotThreshold = "hotThreshold"
         static let autoUpdate = "autoUpdate"
@@ -75,6 +77,7 @@ final class AppSettings {
             Key.showTrayTab: true,
             Key.showTemperature: true,
             Key.showTemperatureLiveActivity: false,
+            Key.showClockInNotch: true,
             Key.warnWhenHot: true,
             Key.hotThreshold: 90,
             Key.autoUpdate: true,
@@ -103,6 +106,7 @@ final class AppSettings {
         showTrayTab = defaults.bool(forKey: Key.showTrayTab)
         showTemperature = defaults.bool(forKey: Key.showTemperature)
         showTemperatureLiveActivity = defaults.bool(forKey: Key.showTemperatureLiveActivity)
+        showClockInNotch = defaults.bool(forKey: Key.showClockInNotch)
         warnWhenHot = defaults.bool(forKey: Key.warnWhenHot)
         hotThreshold = max(defaults.integer(forKey: Key.hotThreshold), 60)
         autoUpdate = defaults.bool(forKey: Key.autoUpdate)

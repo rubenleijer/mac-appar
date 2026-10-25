@@ -91,8 +91,35 @@ struct CompactThermalView: View {
 
     var body: some View {
         let thermal = model.thermal
+        let showsClock = model.settings.showClockInNotch
+        // The camera sits in the middle of a notch, so the clock goes just below it there.
+        let clockBelow = showsClock && model.metrics.hasNotch
+        VStack(spacing: 0) {
+            row(clockInMiddle: showsClock && !clockBelow)
+            if clockBelow {
+                clock
+                    .frame(height: IslandLayout.notchClockHeight, alignment: .top)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
+        .animation(.easeInOut(duration: 0.4), value: thermal.battery)
+    }
+
+    private var clock: some View {
+        TimelineView(.everyMinute) { context in
+            Text(context.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.9))
+                .contentTransition(.numericText())
+        }
+        .help(Date().formatted(date: .complete, time: .omitted))
+    }
+
+    private func row(clockInMiddle: Bool) -> some View {
+        let thermal = model.thermal
         let color = ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold)
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             HStack(spacing: 3) {
                 Image(systemName: "thermometer.medium").font(.system(size: 11, weight: .semibold))
                 Text(thermal.cpuText)
@@ -103,6 +130,10 @@ struct CompactThermalView: View {
             .frame(width: model.thermalSideWidth)
             .padding(.leading, 8)
             Spacer(minLength: 0)
+            if clockInMiddle {
+                clock
+                Spacer(minLength: 0)
+            }
             if let battery = thermal.battery {
                 HStack(spacing: 3) {
                     Image(systemName: battery.symbol).font(.system(size: 12, weight: .semibold))
@@ -119,8 +150,6 @@ struct CompactThermalView: View {
         .padding(.trailing, 8)
         .padding(.horizontal, model.earRadius)
         .frame(height: model.notch.height)
-        .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
-        .animation(.easeInOut(duration: 0.4), value: thermal.battery)
     }
 }
 
