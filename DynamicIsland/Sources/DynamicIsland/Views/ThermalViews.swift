@@ -94,37 +94,35 @@ struct CompactThermalView: View {
     var body: some View {
         let thermal = model.thermal
         let showsClock = model.settings.showClockInNotch
+        let side = model.thermalSideWidth
         HStack(spacing: 0) {
-            Group {
+            // Left of the camera
+            HStack(spacing: 0) {
                 if showsClock {
+                    Spacer(minLength: 0)
                     NotchClock()
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 8)
                 } else {
                     temperature
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 10)
+                    Spacer(minLength: 0)
                 }
             }
-            .frame(width: model.thermalSideWidth + 10)
+            .padding(.leading, showsClock ? 0 : 12)
+            .padding(.trailing, showsClock ? 8 : 0)
+            .frame(width: side)
 
-            Spacer(minLength: model.notch.width)
+            // The camera
+            Color.clear.frame(width: model.notch.width)
 
+            // Right of the camera
             HStack(spacing: 7) {
                 if showsClock { temperature }
-                if let battery = thermal.battery {
-                    HStack(spacing: 2) {
-                        Text("\(battery.percent)%")
-                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                            .contentTransition(.numericText())
-                        Image(systemName: battery.symbol).font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(BatteryBadge.color(battery))
-                }
+                if !showsClock { Spacer(minLength: 0) }
+                if let battery = thermal.battery { batteryLabel(battery) }
+                if showsClock { Spacer(minLength: 0) }
             }
-            .frame(maxWidth: .infinity, alignment: showsClock ? .leading : .trailing)
-            .padding(showsClock ? .leading : .trailing, showsClock ? 8 : 10)
-            .frame(width: model.thermalSideWidth + 10)
+            .padding(.leading, showsClock ? 8 : 0)
+            .padding(.trailing, showsClock ? 0 : 12)
+            .frame(width: side)
         }
         .padding(.horizontal, model.earRadius)
         .frame(height: model.notch.height)
@@ -138,7 +136,21 @@ struct CompactThermalView: View {
             .font(.system(size: 12, weight: .semibold).monospacedDigit())
             .foregroundStyle(ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold))
             .contentTransition(.numericText())
+            .lineLimit(1)
+            .fixedSize()
             .help("CPU temperature")
+    }
+
+    private func batteryLabel(_ battery: ThermalService.Battery) -> some View {
+        HStack(spacing: 3) {
+            Text("\(battery.percent)%")
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .contentTransition(.numericText())
+                .lineLimit(1)
+            Image(systemName: battery.symbol).font(.system(size: 11, weight: .semibold))
+        }
+        .foregroundStyle(BatteryBadge.color(battery))
+        .fixedSize()
     }
 }
 
