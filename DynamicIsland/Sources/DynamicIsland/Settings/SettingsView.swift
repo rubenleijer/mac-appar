@@ -30,9 +30,9 @@ struct SettingsView: View {
                 generalForm
             case .hub:
                 HubSettingsView()
-                    .frame(width: 460, height: 620)
             }
         }
+        .frame(minWidth: 460, idealWidth: 500, maxWidth: .infinity, minHeight: 360, maxHeight: .infinity)
     }
 
     private var generalForm: some View {
@@ -153,8 +153,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onReceive(permissionTimer) { _ in
             hasAccessibility = MediaKeyInterceptor.hasPermission
         }
@@ -196,12 +195,16 @@ final class SettingsWindowController {
         model.close()
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView().environment(model))
-            hosting.sizingOptions = .preferredContentSize
+            // The window sets the size and the forms scroll inside it, so it never runs off the screen.
+            hosting.sizingOptions = [.minSize]
             let window = NSWindow(contentViewController: hosting)
             window.title = "Dynamic Island"
-            window.styleMask = [.titled, .closable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.isReleasedWhenClosed = false
-            window.center()
+            let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 800)
+            window.setContentSize(NSSize(width: 500, height: min(720, visible.height - 60)))
+            window.setFrameAutosaveName("DynamicIslandSettings")
+            if !window.setFrameUsingName("DynamicIslandSettings") { window.center() }
             self.window = window
         }
         NSApp.activate()
