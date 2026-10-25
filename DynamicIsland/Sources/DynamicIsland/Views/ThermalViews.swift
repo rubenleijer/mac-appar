@@ -100,7 +100,8 @@ struct CompactThermalView: View {
                     .contentTransition(.numericText())
             }
             .foregroundStyle(color)
-            .frame(width: model.compactSideWidth + 18)
+            .frame(width: model.thermalSideWidth)
+            .padding(.leading, 8)
             Spacer(minLength: 0)
             if let battery = thermal.battery {
                 HStack(spacing: 3) {
@@ -110,11 +111,12 @@ struct CompactThermalView: View {
                         .contentTransition(.numericText())
                 }
                 .foregroundStyle(BatteryBadge.color(battery))
-                .frame(width: model.compactSideWidth + 18)
+                .frame(width: model.thermalSideWidth)
             } else {
-                Color.clear.frame(width: model.compactSideWidth + 18)
+                Color.clear.frame(width: model.thermalSideWidth)
             }
         }
+        .padding(.trailing, 8)
         .padding(.horizontal, model.earRadius)
         .frame(height: model.notch.height)
         .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
