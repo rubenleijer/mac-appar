@@ -8,8 +8,12 @@ struct HubTab: View {
     var body: some View {
         let hub = model.hub
         VStack(alignment: .leading, spacing: 6) {
-            toolbar
-                .zIndex(1)
+            // The section names give way when the island is narrow.
+            ViewThatFits(in: .horizontal) {
+                toolbar(showsTitles: true)
+                toolbar(showsTitles: false)
+            }
+            .zIndex(1)
             Group {
                 if !hub.isConfigured && hub.lastUpdated == nil {
                     HubSetupState()
@@ -33,7 +37,8 @@ struct HubTab: View {
             .animation(.spring(response: 0.38, dampingFraction: 0.85), value: hub.selectedTaskID)
         }
         .padding(.top, 2)
-        .frame(height: IslandLayout.hubContentHeight - 14, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .frame(height: model.hubContentHeight - 14, alignment: .top)
     }
 
     private var currentSection: HubSection {
@@ -43,11 +48,12 @@ struct HubTab: View {
 
     // MARK: Toolbar
 
-    private var toolbar: some View {
+    private func toolbar(showsTitles: Bool) -> some View {
         let hub = model.hub
         return HStack(spacing: 4) {
             ForEach(hub.settings.visibleSections) { section in
                 HubSectionButton(section: section,
+                                 showsTitle: showsTitles,
                                  count: hub.settings.showCounts ? hub.count(for: section) : 0,
                                  isAlert: section == .tasks && hub.overdueCount > 0,
                                  isSelected: currentSection == section) {
@@ -169,9 +175,8 @@ private struct HubList<Item: Identifiable, Row: View>: View {
                     ForEach(items) { item in row(item) }
                 }
             }
-            .padding(.horizontal, -6)
-            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.9),
-                                         .init(color: .black.opacity(0), location: 1)],
+            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.94),
+                                         .init(color: .black.opacity(0.2), location: 1)],
                                  startPoint: .top, endPoint: .bottom))
         }
     }
@@ -208,7 +213,7 @@ private struct HubRow<Leading: View, Trailing: View>: View {
                 trailing()
             }
             .padding(.horizontal, 6)
-            .frame(height: 38)
+            .frame(height: IslandLayout.hubRowHeight)
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(.white.opacity(isHovering ? 0.08 : 0)))
             .contentShape(Rectangle())
         }
@@ -444,6 +449,7 @@ extension HubNotification.Kind {
 
 private struct HubSectionButton: View {
     let section: HubSection
+    var showsTitle = true
     let count: Int
     let isAlert: Bool
     let isSelected: Bool
@@ -454,7 +460,7 @@ private struct HubSectionButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: section.symbol).font(.system(size: 10.5, weight: .semibold))
-                if isSelected {
+                if isSelected && showsTitle {
                     Text(section.title).font(.system(size: 11, weight: .semibold)).fixedSize()
                 }
                 if count > 0 {

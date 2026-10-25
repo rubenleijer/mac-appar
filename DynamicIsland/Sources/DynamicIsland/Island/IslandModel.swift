@@ -42,6 +42,10 @@ enum IslandLayout {
     static let homeEmptyHeight: CGFloat = 112
     static let postureContentHeight: CGFloat = 150
     static let hubContentHeight: CGFloat = 250
+    static let hubCardHeight: CGFloat = 56
+    static let hubRowHeight: CGFloat = 38
+    static let maxHubCards = 4
+    static let maxHubRows = 5
     static let trayContentHeight: CGFloat = 148
 }
 
@@ -219,7 +223,7 @@ final class IslandModel {
         case .posture:
             return IslandLayout.postureContentHeight
         case .hub:
-            return IslandLayout.hubContentHeight
+            return hubContentHeight
         case .tray:
             return IslandLayout.trayContentHeight
         case .controls:
@@ -228,6 +232,21 @@ final class IslandModel {
             return 4 + sliders * IslandLayout.sliderRowHeight + 8 + IslandLayout.sectionHeaderHeight
                 + rows * IslandLayout.deviceRowHeight + 16
         }
+    }
+
+    /// The Hub tab grows with its list – up to four cards or five rows – so cards are never cut off.
+    var hubContentHeight: CGFloat {
+        let toolbar: CGFloat = 34, bottom: CGFloat = 18
+        guard hub.lastUpdated != nil else { return IslandLayout.hubContentHeight }
+        if hub.selectedTaskID != nil { return IslandLayout.hubContentHeight }
+        let section = hub.settings.visibleSections.contains(hub.section) ? hub.section : (hub.settings.visibleSections.first ?? .tasks)
+        let count = hub.count(for: section == .notifications ? .notifications : section)
+        let items = section == .notifications ? hub.notifications.count : count
+        guard items > 0 else { return toolbar + 70 + bottom }
+        if section == .tasks {
+            return toolbar + CGFloat(min(items, IslandLayout.maxHubCards)) * IslandLayout.hubCardHeight + bottom
+        }
+        return toolbar + CGFloat(min(items, IslandLayout.maxHubRows)) * IslandLayout.hubRowHeight + bottom
     }
 
     /// The region (in screen coordinates) where the pointer counts as "on the island".

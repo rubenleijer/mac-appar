@@ -33,9 +33,11 @@ struct HubTaskRow: View {
                     .foregroundStyle(style.title)
                     .strikethrough(isCompleting, color: style.title.opacity(0.6))
                     .lineLimit(1)
+                    .truncationMode(.tail)
                 subtitle(style: style)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             .contentShape(Rectangle())
             .onTapGesture { hub.select(task) }
 
@@ -59,12 +61,19 @@ struct HubTaskRow: View {
                     .help("Delete")
                     .transition(.opacity)
                 }
-                AvatarStack(names: assigneeNames)
+                // Initials give way first when the island is narrow.
+                ViewThatFits(in: .horizontal) {
+                    AvatarStack(names: assigneeNames)
+                    AvatarStack(names: Array(assigneeNames.prefix(1)))
+                    Color.clear.frame(width: 0)
+                }
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.leading, 10)
         .padding(.trailing, 8)
-        .frame(height: 50)
+        .frame(maxWidth: .infinity)
+        .frame(height: IslandLayout.hubCardHeight - 6)
         .background {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .fill(LinearGradient(colors: [style.tint.opacity(isHovering ? 0.2 : 0.15), style.tint.opacity(0.05)],
@@ -97,14 +106,17 @@ struct HubTaskRow: View {
                 Text(day)
                     .foregroundStyle(style.dayColor)
                     .fontWeight(style.isLate ? .semibold : .regular)
+                    .fixedSize()
             }
             if !parts.isEmpty {
                 Text(parts.joined(separator: " – "))
                     .foregroundStyle(.white.opacity(0.5))
+                    .truncationMode(.tail)
             }
         }
         .font(.system(size: 11))
         .lineLimit(1)
+        .frame(minWidth: 0, alignment: .leading)
     }
 
     private var assigneeNames: [String] {
