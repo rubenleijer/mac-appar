@@ -203,7 +203,7 @@ final class IslandModel {
         case .hubCompact:
             return CGSize(width: notch.width + hudSideWidth * 2 + ears, height: notch.height)
         case .thermalCompact:
-            return CGSize(width: notch.width + compactSideWidth * 2 + 16 + ears, height: notch.height)
+            return CGSize(width: notch.width + (compactSideWidth + 18) * 2 + ears, height: notch.height)
         case .thermalAlert:
             return CGSize(width: notch.width + 260 + ears, height: notch.height + 64)
         case .hud(.volume), .hud(.brightness):

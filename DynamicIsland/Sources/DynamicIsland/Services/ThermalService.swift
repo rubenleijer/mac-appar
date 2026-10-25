@@ -1,5 +1,6 @@
 import Foundation
 import IOKit
+import IOKit.ps
 
 /// Chip, battery and SSD temperatures on Apple silicon, from the same HID temperature sensors
 /// Activity Monitor-style tools read (IOHIDEventSystemClient, private but needs no permission).
@@ -14,7 +15,34 @@ final class ThermalService {
         var thermalState: ProcessInfo.ThermalState
     }
 
+    struct Battery: Equatable {
+        var percent: Int
+        var isCharging: Bool
+        var isOnPower: Bool
+        /// Minutes until empty (on battery) or full (charging), when macOS knows.
+        var minutesLeft: Int?
+
+        var symbol: String {
+            if isCharging { return "battery.100percent.bolt" }
+            switch percent {
+            case ..<13: return "battery.0percent"
+            case ..<38: return "battery.25percent"
+            case ..<63: return "battery.50percent"
+            case ..<88: return "battery.75percent"
+            default: return "battery.100percent"
+            }
+        }
+
+        var timeText: String? {
+            guard let minutesLeft, minutesLeft > 0 else { return nil }
+            let text = minutesLeft >= 60 ? "\(minutesLeft / 60) h \(minutesLeft % 60) min" : "\(minutesLeft) min"
+            return isCharging ? "\(text) to full" : "\(text) left"
+        }
+    }
+
     private(set) var reading: Reading?
+    /// Nil on a Mac without a battery.
+    private(set) var battery: Battery?
     private(set) var isAvailable = false
     /// The last few CPU readings, for the little graph.
     private(set) var history: [Double] = []
@@ -55,11 +83,31 @@ final class ThermalService {
     }
 
     private func refresh() {
+        let next = Self.readBattery()
+        if next != battery { battery = next }
         let sensors = self.sensors
         Task.detached(priority: .utility) {
             let values = sensors.read()
             await MainActor.run { self.apply(values) }
         }
+    }
+
+    /// The internal battery, from IOKit's power sources (public API).
+    private static func readBattery() -> Battery? {
+        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return nil }
+        for source in list {
+            guard let description = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() as? [String: Any],
+                  description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType,
+                  let current = description[kIOPSCurrentCapacityKey] as? Int,
+                  let maximum = description[kIOPSMaxCapacityKey] as? Int, maximum > 0 else { continue }
+            let charging = description[kIOPSIsChargingKey] as? Bool ?? false
+            let onPower = description[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue
+            let minutes = charging ? description[kIOPSTimeToFullChargeKey] as? Int : description[kIOPSTimeToEmptyKey] as? Int
+            return Battery(percent: Int((Double(current) / Double(maximum) * 100).rounded()),
+                           isCharging: charging, isOnPower: onPower, minutesLeft: minutes)
+        }
+        return nil
     }
 
     private func apply(_ values: [(name: String, value: Double)]) {

@@ -42,8 +42,11 @@ struct TemperatureRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
+            if let battery = thermal.battery {
+                BatteryBadge(battery: battery)
+            }
             Sparkline(values: thermal.history, color: color)
-                .frame(width: 90, height: 24)
+                .frame(width: 70, height: 24)
         }
         .animation(.easeInOut(duration: 0.4), value: reading?.cpu)
         .help("Temperatures update every few seconds")
@@ -90,20 +93,64 @@ struct CompactThermalView: View {
         let thermal = model.thermal
         let color = ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold)
         HStack(spacing: 0) {
-            Image(systemName: "thermometer.medium")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(color)
-                .frame(width: model.compactSideWidth + 8)
+            HStack(spacing: 3) {
+                Image(systemName: "thermometer.medium").font(.system(size: 11, weight: .semibold))
+                Text(thermal.cpuText)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .contentTransition(.numericText())
+            }
+            .foregroundStyle(color)
+            .frame(width: model.compactSideWidth + 18)
             Spacer(minLength: 0)
-            Text(thermal.cpuText)
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(color)
-                .contentTransition(.numericText())
-                .frame(width: model.compactSideWidth + 8)
+            if let battery = thermal.battery {
+                HStack(spacing: 3) {
+                    Image(systemName: battery.symbol).font(.system(size: 12, weight: .semibold))
+                    Text("\(battery.percent)%")
+                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .contentTransition(.numericText())
+                }
+                .foregroundStyle(BatteryBadge.color(battery))
+                .frame(width: model.compactSideWidth + 18)
+            } else {
+                Color.clear.frame(width: model.compactSideWidth + 18)
+            }
         }
         .padding(.horizontal, model.earRadius)
         .frame(height: model.notch.height)
         .animation(.easeInOut(duration: 0.4), value: thermal.reading?.cpu)
+        .animation(.easeInOut(duration: 0.4), value: thermal.battery)
+    }
+}
+
+/// The battery's charge with its icon, and the time left when macOS knows it.
+struct BatteryBadge: View {
+    let battery: ThermalService.Battery
+
+    static func color(_ battery: ThermalService.Battery) -> Color {
+        if battery.isCharging || battery.isOnPower { return .green }
+        if battery.percent <= 10 { return Color(red: 1, green: 0.36, blue: 0.34) }
+        if battery.percent <= 20 { return .orange }
+        return .white
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            HStack(spacing: 4) {
+                Image(systemName: battery.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Self.color(battery))
+                Text("\(battery.percent)%")
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+            }
+            Text(battery.timeText ?? (battery.isOnPower ? (battery.isCharging ? "Charging" : "On power") : "On battery"))
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.45))
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .help(battery.isCharging ? "Charging" : (battery.isOnPower ? "Connected to power" : "On battery"))
     }
 }
 

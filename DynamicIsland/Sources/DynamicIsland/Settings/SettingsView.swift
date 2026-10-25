@@ -59,8 +59,8 @@ struct SettingsView: View {
             }
 
             Section {
-                Toggle("Show temperature in Sound and display", isOn: $settings.showTemperature)
-                Toggle("Show the temperature beside the notch", isOn: $settings.showTemperatureLiveActivity)
+                Toggle("Show temperature and battery in Sound and display", isOn: $settings.showTemperature)
+                Toggle("Show temperature and battery beside the notch", isOn: $settings.showTemperatureLiveActivity)
                 HStack {
                     Toggle("Warn when the Mac runs hot", isOn: $settings.warnWhenHot)
                     Spacer()
@@ -77,7 +77,7 @@ struct SettingsView: View {
                     Spacer()
                 }
             } header: {
-                Text("Temperature")
+                Text("Temperature and battery")
             } footer: {
                 Text("Read from the chip’s own sensors every few seconds. The notch shows it only when nothing else is there.")
                     .foregroundStyle(.secondary)
