@@ -30,12 +30,18 @@ final class UpdateService {
 
     func start() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
+        // Often enough that a pushed fix shows up within a couple of minutes; well inside
+        // GitHub's limit of 60 unauthenticated requests an hour.
+        timer = Timer.scheduledTimer(withTimeInterval: 2 * 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.checkAutomatically() }
         }
-        timer?.tolerance = 120
+        timer?.tolerance = 20
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
+                                                          queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkAutomatically() }
+        }
         Task {
-            try? await Task.sleep(for: .seconds(60))
+            try? await Task.sleep(for: .seconds(20))
             checkAutomatically()
         }
     }
@@ -73,7 +79,17 @@ final class UpdateService {
             let message = ((json["commit"] as? [String: Any])?["message"] as? String)?
                 .components(separatedBy: .newlines).first ?? "New version"
             state = .available(message)
-            if installIfAvailable, settings.autoInstallUpdates, canInstallNow() { install() }
+            if installIfAvailable, settings.autoInstallUpdates {
+                if canInstallNow() {
+                    install()
+                } else {
+                    // The island is in use; try again shortly.
+                    Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(30))
+                        await self?.check(installIfAvailable: true)
+                    }
+                }
+            }
         } catch {
             state = .failed(error.localizedDescription)
         }

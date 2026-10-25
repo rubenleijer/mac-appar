@@ -278,44 +278,48 @@ struct IslandScroll<Content: View>: View {
                 .offset(x: axis == .horizontal ? -shown : 0, y: axis == .vertical ? -shown : 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onGeometryChange(for: CGFloat.self, of: { axis == .vertical ? $0.size.height : $0.size.width }) {
-            viewport = $0
-        }
         .clipShape(Rectangle())
         .contentShape(Rectangle())
-        .onHover { inside in
-            if inside {
-                let offset = $offset, viewport = $viewport, contentLength = $contentLength, axis = axis
-                IslandScrollRouter.shared.enter(id) { event in
-                    let limit = max(contentLength.wrappedValue - viewport.wrappedValue, 0)
-                    guard limit > 0 else { return false }
-                    let scale: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 12
-                    var delta = axis == .vertical ? event.scrollingDeltaY : event.scrollingDeltaX
-                    // A plain mouse wheel only scrolls vertically; let it move horizontal rows too.
-                    if axis == .horizontal, abs(event.scrollingDeltaX) < abs(event.scrollingDeltaY) { delta = event.scrollingDeltaY }
-                    let current = min(max(offset.wrappedValue, 0), limit)
-                    offset.wrappedValue = min(max(current - delta * scale, 0), limit)
-                    return true
-                }
-            } else {
-                IslandScrollRouter.shared.leave(id)
-            }
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { frame in
+            viewport = axis == .vertical ? frame.height : frame.width
+            register(frame)
         }
-        .onDisappear { IslandScrollRouter.shared.leave(id) }
+        .onDisappear { IslandScrollRouter.shared.remove(id) }
+    }
+
+    /// Routes scroll events that land inside `frame` (window coordinates, top-left origin) here.
+    private func register(_ frame: CGRect) {
+        let offset = $offset, viewport = $viewport, contentLength = $contentLength, axis = axis
+        IslandScrollRouter.shared.set(id, frame: frame) { event in
+            let limit = max(contentLength.wrappedValue - viewport.wrappedValue, 0)
+            guard limit > 0 else { return false }
+            let scale: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 12
+            var delta = axis == .vertical ? event.scrollingDeltaY : event.scrollingDeltaX
+            // A plain mouse wheel only scrolls vertically; let it move horizontal rows too.
+            if axis == .horizontal, abs(event.scrollingDeltaX) < abs(event.scrollingDeltaY) { delta = event.scrollingDeltaY }
+            let current = min(max(offset.wrappedValue, 0), limit)
+            offset.wrappedValue = min(max(current - delta * scale, 0), limit)
+            return true
+        }
     }
 }
 
-/// Sends scroll events in the island to the `IslandScroll` under the pointer.
+/// Sends scroll events in the island to the `IslandScroll` under the pointer, found by position
+/// (hover tracking isn't reliable in a panel that never becomes key).
 @MainActor
 final class IslandScrollRouter {
     static let shared = IslandScrollRouter()
 
-    private var stack: [(id: UUID, handler: (NSEvent) -> Bool)] = []
+    private struct Target {
+        var frame: CGRect
+        var handler: (NSEvent) -> Bool
+    }
+
+    private var targets: [UUID: Target] = [:]
     private var monitor: Any?
 
-    func enter(_ id: UUID, handler: @escaping (NSEvent) -> Bool) {
-        stack.removeAll { $0.id == id }
-        stack.append((id, handler))
+    func set(_ id: UUID, frame: CGRect, handler: @escaping (NSEvent) -> Bool) {
+        targets[id] = Target(frame: frame, handler: handler)
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             let handled = MainActor.assumeIsolated { IslandScrollRouter.shared.route(event) }
@@ -323,11 +327,19 @@ final class IslandScrollRouter {
         }
     }
 
-    func leave(_ id: UUID) {
-        stack.removeAll { $0.id == id }
+    func remove(_ id: UUID) {
+        targets[id] = nil
     }
 
     private func route(_ event: NSEvent) -> Bool {
-        stack.last?.handler(event) ?? false
+        guard let window = event.window, let content = window.contentView else { return false }
+        // SwiftUI's global space has its origin at the top left of the window's content.
+        let location = event.locationInWindow
+        let point = CGPoint(x: location.x, y: content.bounds.height - location.y)
+        // The innermost (smallest) scroller under the pointer wins.
+        let hit = targets.values
+            .filter { $0.frame.contains(point) }
+            .min { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        return hit?.handler(event) ?? false
     }
 }
