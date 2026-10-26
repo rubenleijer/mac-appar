@@ -257,6 +257,8 @@ func formatTime(_ seconds: Double) -> String {
 /// fed by scroll-wheel and trackpad events, so buttons and rows inside it stay clickable.
 struct IslandScroll<Content: View>: View {
     var axis: Axis = .vertical
+    /// Keep the end in view as content is added, while already scrolled to the end.
+    var followsEnd = false
     @ViewBuilder var content: Content
 
     @State private var offset: CGFloat = 0
@@ -272,8 +274,10 @@ struct IslandScroll<Content: View>: View {
                 .fixedSize(horizontal: axis == .horizontal, vertical: axis == .vertical)
                 .frame(maxWidth: axis == .vertical ? .infinity : nil,
                        maxHeight: axis == .horizontal ? .infinity : nil, alignment: .topLeading)
-                .onGeometryChange(for: CGFloat.self, of: { axis == .vertical ? $0.size.height : $0.size.width }) {
-                    contentLength = $0
+                .onGeometryChange(for: CGFloat.self, of: { axis == .vertical ? $0.size.height : $0.size.width }) { length in
+                    let wasAtEnd = offset >= max(contentLength - viewport, 0) - 1
+                    contentLength = length
+                    if followsEnd && (wasAtEnd || offset == 0) { offset = max(length - viewport, 0) }
                 }
                 .offset(x: axis == .horizontal ? -shown : 0, y: axis == .vertical ? -shown : 0)
         }

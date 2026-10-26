@@ -84,6 +84,19 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show Clipboard queue tab", isOn: $settings.showClipboardTab)
+                Picker("Keep", selection: $settings.clipboardLimit) {
+                    ForEach([10, 20, 30, 50, 100], id: \.self) { Text("\($0) items").tag($0) }
+                }
+                .disabled(!settings.showClipboardTab)
+            } header: {
+                Text("Clipboard queue")
+            } footer: {
+                Text("Everything you copy lines up in the island. Click an item to put it on the clipboard; with Queue on, each ⌘V moves on to the next one (needs Accessibility). Passwords from password managers are never kept, and only text is saved between launches.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Show Tray tab", isOn: $settings.showTrayTab)
                 Toggle("Open the tray when dragging files to the notch", isOn: $settings.openTrayOnDrag)
                     .disabled(!settings.showTrayTab)

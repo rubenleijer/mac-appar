@@ -22,6 +22,9 @@ struct OpenIslandView: View {
                 case .tray:
                     TrayTab()
                         .transition(.islandContent(scale: 0.97))
+                case .clipboard:
+                    ClipboardTab()
+                        .transition(.islandContent(scale: 0.97))
                 case .posture:
                     PostureTab()
                         .transition(.islandContent(scale: 0.97))
@@ -36,33 +39,60 @@ struct OpenIslandView: View {
         .padding(.horizontal, model.earRadius)
     }
 
+    /// Tabs left of the camera, the rest – and the gear – right of it, so none hide under the notch.
     private var header: some View {
-        HStack(spacing: 0) {
+        let tabs = visibleTabs
+        let leftCount = min(tabs.count, maxTabsPerSide)
+        return HStack(spacing: 0) {
             HStack(spacing: 2) {
-                tabButton(.media, symbol: "music.note", help: "Now Playing")
-                if model.showsHubTab {
-                    tabButton(.hub, symbol: "checklist", help: "Acord Hub", badge: model.hub.unreadCount)
-                }
-                if model.settings.showTrayTab {
-                    tabButton(.tray, symbol: model.tray.items.isEmpty ? "tray.fill" : "tray.full.fill", help: "Tray")
-                }
-                if model.settings.showHomeTab {
-                    tabButton(.home, symbol: "house.fill", help: "Home")
-                }
-                tabButton(.controls, symbol: "switch.2", help: "Sound and display")
-                if model.showsPostureTab {
-                    tabButton(.posture, symbol: "figure.stand", help: "Posture")
+                ForEach(tabs.prefix(leftCount), id: \.tab) { item in
+                    tabButton(item.tab, symbol: item.symbol, help: item.help, badge: item.badge)
                 }
             }
             Spacer(minLength: model.notch.width + 12)
-            Button { model.onOpenSettings?() } label: {
-                Image(systemName: "gearshape.fill").font(.system(size: 12, weight: .semibold))
+            HStack(spacing: 2) {
+                ForEach(tabs.dropFirst(leftCount), id: \.tab) { item in
+                    tabButton(item.tab, symbol: item.symbol, help: item.help, badge: item.badge)
+                }
+                Button { model.onOpenSettings?() } label: {
+                    Image(systemName: "gearshape.fill").font(.system(size: 12, weight: .semibold))
+                }
+                .buttonStyle(IslandButtonStyle(diameter: 26))
+                .help("Settings")
             }
-            .buttonStyle(IslandButtonStyle(diameter: 26))
-            .help("Settings")
         }
         .padding(.horizontal, IslandLayout.contentPadding - 6)
         .frame(height: model.notch.height)
+    }
+
+    private struct TabItem {
+        let tab: IslandTab
+        let symbol: String
+        let help: String
+        var badge = 0
+    }
+
+    private var visibleTabs: [TabItem] {
+        var tabs = [TabItem(tab: .media, symbol: "music.note", help: "Now Playing")]
+        if model.showsHubTab {
+            tabs.append(TabItem(tab: .hub, symbol: "checklist", help: "Acord Hub", badge: model.hub.unreadCount))
+        }
+        if model.settings.showClipboardTab {
+            tabs.append(TabItem(tab: .clipboard, symbol: "doc.on.clipboard.fill", help: "Clipboard queue"))
+        }
+        if model.settings.showTrayTab {
+            tabs.append(TabItem(tab: .tray, symbol: model.tray.items.isEmpty ? "tray.fill" : "tray.full.fill", help: "Tray"))
+        }
+        if model.settings.showHomeTab { tabs.append(TabItem(tab: .home, symbol: "house.fill", help: "Home")) }
+        tabs.append(TabItem(tab: .controls, symbol: "switch.2", help: "Sound and display"))
+        if model.showsPostureTab { tabs.append(TabItem(tab: .posture, symbol: "figure.stand", help: "Posture")) }
+        return tabs
+    }
+
+    /// How many 34 pt tab buttons fit beside the camera.
+    private var maxTabsPerSide: Int {
+        let side = (model.openWidth - model.notch.width) / 2 - IslandLayout.contentPadding
+        return max(Int(side / 36), 2)
     }
 
     private func tabButton(_ tab: IslandTab, symbol: String, help: String, badge: Int = 0) -> some View {

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum IslandTab: Hashable {
-    case media, hub, tray, home, controls, posture
+    case media, hub, clipboard, tray, home, controls, posture
 }
 
 enum HUDKind: Equatable {
@@ -51,6 +51,7 @@ enum IslandLayout {
     static let maxHubCards = 4
     static let maxHubRows = 5
     static let trayContentHeight: CGFloat = 148
+    static let clipboardContentHeight: CGFloat = 236
     static let temperatureRowHeight: CGFloat = 40
 }
 
@@ -64,6 +65,7 @@ final class IslandModel {
     let hub: AcordHubService
     let tray: TrayService
     let thermal: ThermalService
+    let clipboard: ClipboardService
     let settings: AppSettings
 
     var metrics = NotchMetrics.fallback
@@ -93,7 +95,7 @@ final class IslandModel {
 
     init(media: NowPlayingService, audio: AudioService, brightness: BrightnessService, home: HomeService,
          posture: PostureService, hub: AcordHubService, tray: TrayService, thermal: ThermalService,
-         settings: AppSettings) {
+         clipboard: ClipboardService, settings: AppSettings) {
         self.media = media
         self.audio = audio
         self.brightness = brightness
@@ -102,6 +104,7 @@ final class IslandModel {
         self.hub = hub
         self.tray = tray
         self.thermal = thermal
+        self.clipboard = clipboard
         self.settings = settings
 
         media.onTrackChange = { [weak self] in self?.showTrackPeek() }
@@ -229,6 +232,7 @@ final class IslandModel {
         case .home where !settings.showHomeTab: .media
         case .hub where !showsHubTab: .media
         case .tray where !settings.showTrayTab: .media
+        case .clipboard where !settings.showClipboardTab: .media
         case .posture where !showsPostureTab: .media
         default: tab
         }
@@ -249,6 +253,8 @@ final class IslandModel {
             return hubContentHeight
         case .tray:
             return IslandLayout.trayContentHeight
+        case .clipboard:
+            return IslandLayout.clipboardContentHeight
         case .controls:
             let sliders: CGFloat = brightness.isAvailable ? 2 : 1
             let rows = CGFloat(min(audio.devices.count, IslandLayout.maxVisibleDevices))

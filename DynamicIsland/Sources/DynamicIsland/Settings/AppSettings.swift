@@ -14,6 +14,8 @@ final class AppSettings {
     var showPostureLiveActivity: Bool { didSet { store(showPostureLiveActivity, Key.showPostureLiveActivity) } }
     var homeFolderName: String { didSet { defaults.set(homeFolderName, forKey: Key.homeFolderName) } }
     var showTrayTab: Bool { didSet { store(showTrayTab, Key.showTrayTab) } }
+    var showClipboardTab: Bool { didSet { store(showClipboardTab, Key.showClipboardTab) } }
+    var clipboardLimit: Int { didSet { defaults.set(clipboardLimit, forKey: Key.clipboardLimit) } }
     var showTemperature: Bool { didSet { store(showTemperature, Key.showTemperature) } }
     var showTemperatureLiveActivity: Bool { didSet { store(showTemperatureLiveActivity, Key.showTemperatureLiveActivity) } }
     var showClockInNotch: Bool { didSet { store(showClockInNotch, Key.showClockInNotch) } }
@@ -49,6 +51,8 @@ final class AppSettings {
         static let showPostureAlerts = "showPostureAlerts"
         static let showPostureLiveActivity = "showPostureLiveActivity"
         static let showTrayTab = "showTrayTab"
+        static let showClipboardTab = "showClipboardTab"
+        static let clipboardLimit = "clipboardLimit"
         static let showTemperature = "showTemperature"
         static let showTemperatureLiveActivity = "showTemperatureLiveActivity"
         static let showClockInNotch = "showClockInNotch"
@@ -75,6 +79,8 @@ final class AppSettings {
             Key.replaceSystemHUD: false,
             Key.showHomeTab: false,
             Key.showTrayTab: true,
+            Key.showClipboardTab: true,
+            Key.clipboardLimit: 30,
             Key.showTemperature: true,
             Key.showTemperatureLiveActivity: false,
             Key.showClockInNotch: true,
@@ -104,6 +110,8 @@ final class AppSettings {
         showPostureLiveActivity = defaults.bool(forKey: Key.showPostureLiveActivity)
         homeFolderName = defaults.string(forKey: Key.homeFolderName) ?? "Home"
         showTrayTab = defaults.bool(forKey: Key.showTrayTab)
+        showClipboardTab = defaults.bool(forKey: Key.showClipboardTab)
+        clipboardLimit = max(defaults.integer(forKey: Key.clipboardLimit), 5)
         showTemperature = defaults.bool(forKey: Key.showTemperature)
         showTemperatureLiveActivity = defaults.bool(forKey: Key.showTemperatureLiveActivity)
         showClockInNotch = defaults.bool(forKey: Key.showClockInNotch)
