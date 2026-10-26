@@ -67,6 +67,16 @@ enum HubPriority: String, CaseIterable, Identifiable, Comparable {
         }
     }
     static func < (lhs: Self, rhs: Self) -> Bool { lhs.rank < rhs.rank }
+
+    var swedishTitle: String {
+        switch self {
+        case .none: "Ingen"
+        case .low: "Låg"
+        case .medium: "Medel"
+        case .high: "Hög"
+        case .dangerous: "Kritisk"
+        }
+    }
 }
 
 /// What the island shows when it opens.

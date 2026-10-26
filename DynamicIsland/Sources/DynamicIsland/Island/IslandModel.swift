@@ -46,6 +46,7 @@ enum IslandLayout {
     static let homeEmptyHeight: CGFloat = 112
     static let postureContentHeight: CGFloat = 150
     static let hubContentHeight: CGFloat = 250
+    static let calendarContentHeight: CGFloat = 352
     static let hubCardHeight: CGFloat = 56
     static let hubRowHeight: CGFloat = 38
     static let maxHubCards = 4
@@ -81,6 +82,8 @@ final class IslandModel {
     @ObservationIgnored var onQuickAddTask: (() -> Void)?
     /// Opens the task editor; `true` focuses a new checklist item.
     @ObservationIgnored var onEditTask: ((HubTask, Bool) -> Void)?
+    /// Opens the meeting editor: an event to change, or nil and a start time for a new one.
+    @ObservationIgnored var onEditMeeting: ((HubEvent?, Date?) -> Void)?
     @ObservationIgnored private var openTask: Task<Void, Never>?
     @ObservationIgnored private var closeTask: Task<Void, Never>?
     @ObservationIgnored private var hudTask: Task<Void, Never>?
@@ -269,6 +272,7 @@ final class IslandModel {
         let toolbar: CGFloat = 34, bottom: CGFloat = 32
         guard hub.lastUpdated != nil else { return IslandLayout.hubContentHeight }
         if hub.selectedTaskID != nil { return IslandLayout.hubContentHeight }
+        if hub.settings.visibleSections.contains(.calendar), hub.section == .calendar { return IslandLayout.calendarContentHeight }
         let section = hub.settings.visibleSections.contains(hub.section) ? hub.section : (hub.settings.visibleSections.first ?? .tasks)
         let count = hub.count(for: section == .notifications ? .notifications : section)
         let items = section == .notifications ? hub.notifications.count : count

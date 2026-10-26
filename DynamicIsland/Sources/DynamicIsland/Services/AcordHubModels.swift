@@ -98,8 +98,17 @@ struct HubEvent: Identifiable, Equatable {
     var meetLink: URL?
     /// The event in Google Calendar.
     var webLink: URL?
+    /// Google's id (without the "meeting-" prefix) and calendar, for editing.
+    var googleID: String?
+    var calendarID: String?
+    var detail: String?
+    /// The calendar's colour, as hex.
+    var colorHex: String?
+    var attendeeCount: Int = 0
 
     var isMeeting: Bool { id.hasPrefix("meeting-") }
+
+    var endDate: Date { end ?? start.addingTimeInterval(isAllDay ? 86_400 : 3600) }
 
     func isOngoing(now: Date) -> Bool {
         guard !isAllDay, start <= now else { return false }
@@ -378,7 +387,12 @@ extension HubEvent {
                   clientName: json.string("client_name", "clientName"),
                   location: json.string("location", "place"),
                   meetLink: json.string("meet_link", "hangoutLink").flatMap(URL.init(string:)),
-                  webLink: json.string("html_link", "htmlLink").flatMap(URL.init(string:)))
+                  webLink: json.string("html_link", "htmlLink").flatMap(URL.init(string:)),
+                  googleID: json.string("google_id"),
+                  calendarID: json.string("calendar_id", "calendarId"),
+                  detail: json.string("description", "notes"),
+                  colorHex: json.string("color", "background_color"),
+                  attendeeCount: Int(json.string("attendees") ?? "") ?? 0)
     }
 }
 

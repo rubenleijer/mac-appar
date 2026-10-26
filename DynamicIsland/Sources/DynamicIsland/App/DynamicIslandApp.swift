@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
     private var quickAddWindow: QuickAddTaskController?
     private var taskEditor: TaskEditorController?
+    private var meetingEditor: MeetingEditorController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installEditMenu()
@@ -41,6 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.updates = updates
         let taskEditor = TaskEditorController(model: model)
         model.onEditTask = { [weak taskEditor] task, checklist in taskEditor?.show(task, focusChecklist: checklist) }
+        let meetingEditor = MeetingEditorController(model: model)
+        model.onEditMeeting = { [weak meetingEditor] event, start in meetingEditor?.show(event, start: start) }
 
         let islandWindow = IslandWindowController(model: model)
         islandWindow.show()
@@ -65,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.settingsWindow = settingsWindow
         self.quickAddWindow = quickAddWindow
         self.taskEditor = taskEditor
+        self.meetingEditor = meetingEditor
 
         #if DEBUG
         if let flag = CommandLine.arguments.firstIndex(of: "--snapshots"), flag + 1 < CommandLine.arguments.count {

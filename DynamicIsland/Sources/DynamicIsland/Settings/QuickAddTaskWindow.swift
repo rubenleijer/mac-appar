@@ -59,6 +59,7 @@ private struct QuickAddTaskView: View {
     @State private var customDate = Date()
     @State private var projectID = ""
     @State private var assigneeID = ""
+    @State private var priority: HubPriority = .low
     @State private var isSaving = false
     @State private var error: String?
     @FocusState private var isTitleFocused: Bool
@@ -75,6 +76,16 @@ private struct QuickAddTaskView: View {
             if due == .custom {
                 DatePicker("Date", selection: $customDate, displayedComponents: .date)
             }
+            Picker("Prioritet", selection: $priority) {
+                ForEach(Array(HubPriority.allCases.reversed())) { level in
+                    HStack {
+                        Circle().fill(level.cardColor).frame(width: 8, height: 8)
+                        Text(level.swedishTitle)
+                    }
+                    .tag(level)
+                }
+            }
+            .pickerStyle(.menu)
             Picker("Project", selection: $projectID) {
                 Text("No project").tag("")
                 ForEach(hub.projects) { project in
@@ -131,7 +142,8 @@ private struct QuickAddTaskView: View {
             do {
                 try await model.hub.createTask(title: text, dueDate: dueDate,
                                                projectID: projectID.isEmpty ? nil : projectID,
-                                               assigneeID: assigneeID.isEmpty ? nil : assigneeID)
+                                               assigneeID: assigneeID.isEmpty ? nil : assigneeID,
+                                               priority: priority)
                 onClose()
             } catch {
                 self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription

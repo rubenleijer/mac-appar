@@ -259,6 +259,8 @@ struct IslandScroll<Content: View>: View {
     var axis: Axis = .vertical
     /// Keep the end in view as content is added, while already scrolled to the end.
     var followsEnd = false
+    /// Where to start, e.g. the current hour in a calendar.
+    var initialOffset: CGFloat?
     @ViewBuilder var content: Content
 
     @State private var offset: CGFloat = 0
@@ -290,6 +292,7 @@ struct IslandScroll<Content: View>: View {
             viewport = axis == .vertical ? frame.height : frame.width
             register(frame)
         }
+        .onAppear { if let initialOffset { offset = initialOffset } }
         .onDisappear { IslandScrollRouter.shared.remove(id) }
     }
 

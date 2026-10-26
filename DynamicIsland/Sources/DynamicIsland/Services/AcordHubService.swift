@@ -341,11 +341,7 @@ final class AcordHubService {
             if meetings["connected"] as? Bool == true {
                 calendarConnection = .connected
                 let rows = (meetings["events"] as? [[String: Any]]) ?? []
-                calendar += rows.compactMap { row in
-                    var raw = row
-                    raw["id"] = "meeting-" + (row["id"] as? String ?? UUID().uuidString)
-                    return HubEvent(HubJSON(raw: raw))
-                }
+                calendar += rows.compactMap(Self.meeting)
             } else if let error = meetings["error"] as? String {
                 HubLog.write("meetings: \(error)")
             } else {
@@ -362,6 +358,15 @@ final class AcordHubService {
         }
         if let minutes = (snapshot["time_today_minutes"] as? NSNumber)?.doubleValue { loggedToday = minutes * 60 }
         return approvalRows != nil
+    }
+
+    /// A Google meeting row from the Hub, tagged so it can be told apart from Hub events.
+    private static func meeting(_ row: [String: Any]) -> HubEvent? {
+        var raw = row
+        let googleID = row["id"] as? String ?? UUID().uuidString
+        raw["id"] = "meeting-" + googleID
+        raw["google_id"] = googleID
+        return HubEvent(HubJSON(raw: raw))
     }
 
     /// The older Hub, without `dashboard_snapshot`: one call per list. Returns whether approvals were missing.
@@ -401,6 +406,139 @@ final class AcordHubService {
     private static func unique(_ tasks: [HubTask]) -> [HubTask] {
         var seen = Set<String>()
         return tasks.filter { seen.insert($0.id).inserted }
+    }
+
+    // MARK: Calendar
+
+    /// First day of the three-day calendar.
+    private(set) var calendarStart = Calendar.current.startOfDay(for: Date())
+    /// Events fetched for days outside the refresh window (looking back, or far ahead).
+    private(set) var rangeEvents: [HubEvent] = []
+    private(set) var selectedEventID: String?
+
+    var calendarDays: [Date] {
+        (0..<3).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: calendarStart) }
+    }
+
+    var selectedEvent: HubEvent? {
+        guard let selectedEventID else { return nil }
+        return (events + rangeEvents).first { $0.id == selectedEventID }
+    }
+
+    /// Everything on a day: Google meetings and Hub events, all-day first.
+    func calendarEvents(on day: Date) -> [HubEvent] {
+        let start = Calendar.current.startOfDay(for: day)
+        guard let end = Calendar.current.date(byAdding: .day, value: 1, to: start) else { return [] }
+        var seen = Set<String>()
+        return (events + rangeEvents)
+            .filter { seen.insert($0.id).inserted }
+            .filter { $0.start < end && $0.endDate > start }
+            .sorted { $0.start < $1.start }
+    }
+
+    func moveCalendar(by days: Int) {
+        let target = Calendar.current.date(byAdding: .day, value: days, to: calendarStart) ?? calendarStart
+        setCalendarStart(target)
+    }
+
+    func showToday() { setCalendarStart(Date()) }
+
+    func select(event: HubEvent?) {
+        selectedEventID = event?.id
+    }
+
+    private func setCalendarStart(_ day: Date) {
+        calendarStart = Calendar.current.startOfDay(for: day)
+        selectedEventID = nil
+        let today = Calendar.current.startOfDay(for: Date())
+        let last = Calendar.current.date(byAdding: .day, value: 2, to: calendarStart) ?? calendarStart
+        // The refresh covers today and the next month; other days are fetched on demand.
+        if calendarStart < today || last > (Calendar.current.date(byAdding: .day, value: 30, to: today) ?? today) {
+            Task { await loadCalendarRange() }
+        }
+    }
+
+    private func loadCalendarRange() async {
+        let from = HubDate.dayString(calendarStart)
+        let to = HubDate.dayString(Calendar.current.date(byAdding: .day, value: 2, to: calendarStart) ?? calendarStart)
+        var found: [HubEvent] = []
+        if let data = await perform("list_calendar_events", ["from": .string(from), "to": .string(to), "limit": .int(300)],
+                                    showsErrors: false) {
+            found += HubJSON.list(data, key: "events").compactMap { HubEvent($0) }
+        }
+        if !settings.memberID.isEmpty,
+           let data = await perform("list_my_meetings", ["user_id": .string(settings.memberID), "from": .string(from), "to": .string(to)],
+                                    showsErrors: false),
+           let rows = Self.object(data)?["events"] as? [[String: Any]] {
+            found += rows.compactMap(Self.meeting)
+        }
+        rangeEvents = found
+    }
+
+    struct MeetingDraft {
+        var title = ""
+        var start = Date()
+        var end = Date().addingTimeInterval(3600)
+        var allDay = false
+        var location = ""
+        var detail = ""
+        var attendees = ""
+        var addMeet = false
+    }
+
+    /// Creates or changes a Google meeting. Returns an error message, or nil when it worked.
+    func saveMeeting(_ draft: MeetingDraft, editing event: HubEvent?) async -> String? {
+        guard !settings.memberID.isEmpty else { return "Välj dig själv under ”Du är” i inställningarna först." }
+        let iso = ISO8601DateFormatter()
+        iso.timeZone = .current
+        var arguments: [String: HubArgument] = [
+            "user_id": .string(settings.memberID),
+            "title": .string(draft.title.trimmingCharacters(in: .whitespaces)),
+            "start": .string(iso.string(from: draft.start)),
+            "end": .string(iso.string(from: draft.end)),
+            "all_day": .bool(draft.allDay),
+            "location": draft.location.isEmpty ? .null : .string(draft.location),
+            "description": draft.detail.isEmpty ? .null : .string(draft.detail),
+            "attendees": .strings(draft.attendees.split(whereSeparator: { $0 == "," || $0 == " " || $0 == "\n" })
+                .map(String.init).filter { $0.contains("@") }),
+            "add_meet": .bool(draft.addMeet),
+        ]
+        let tool: String
+        if let event, let googleID = event.googleID {
+            tool = "update_meeting"
+            arguments["event_id"] = .string(googleID)
+            if let calendar = event.calendarID { arguments["calendar_id"] = .string(calendar) }
+        } else {
+            tool = "create_meeting"
+        }
+        guard await perform(tool, arguments, showsErrors: false) != nil else {
+            return "Kunde inte spara i Google Kalender. Är kalendern kopplad i Hubben?"
+        }
+        showToast(event == nil ? "Lade till ”\(draft.title)”" : "Sparade ”\(draft.title)”")
+        await reloadCalendar()
+        return nil
+    }
+
+    func deleteMeeting(_ event: HubEvent) {
+        guard let googleID = event.googleID, !settings.memberID.isEmpty else { return }
+        guard Self.confirm("Ta bort ”\(event.title)”?", detail: event.attendeeCount > 0 ? "Deltagarna får besked." : nil,
+                           button: "Ta bort") else { return }
+        var arguments: [String: HubArgument] = ["user_id": .string(settings.memberID), "event_id": .string(googleID)]
+        if let calendar = event.calendarID { arguments["calendar_id"] = .string(calendar) }
+        selectedEventID = nil
+        events.removeAll { $0.id == event.id }
+        rangeEvents.removeAll { $0.id == event.id }
+        Task {
+            if await perform("delete_meeting", arguments) != nil {
+                showToast("Tog bort ”\(event.title)”")
+            }
+            await reloadCalendar()
+        }
+    }
+
+    private func reloadCalendar() async {
+        refresh(force: true)
+        await loadCalendarRange()
     }
 
     // MARK: Task actions
@@ -809,8 +947,9 @@ final class AcordHubService {
     // MARK: Actions
 
     /// Creates a task in the Hub. Assigns it to the user unless `assigneeID` says otherwise.
-    func createTask(title: String, dueDate: Date?, projectID: String?, assigneeID: String?) async throws {
-        var arguments: [String: HubArgument] = ["title": .string(title)]
+    func createTask(title: String, dueDate: Date?, projectID: String?, assigneeID: String?,
+                    priority: HubPriority = .low) async throws {
+        var arguments: [String: HubArgument] = ["title": .string(title), "priority": .string(priority.rawValue)]
         if let dueDate { arguments["due_date"] = .string(HubDate.dayString(dueDate)) }
         if let projectID, !projectID.isEmpty { arguments["project_id"] = .string(projectID) }
         if let assigneeID, !assigneeID.isEmpty { arguments["assignee"] = .string(assigneeID) }

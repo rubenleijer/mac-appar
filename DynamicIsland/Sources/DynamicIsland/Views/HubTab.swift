@@ -141,14 +141,7 @@ struct HubTab: View {
                 .transition(.opacity)
             }
         case .calendar:
-            VStack(spacing: 6) {
-                if case .notConnected(let message, _) = hub.calendarConnection {
-                    CalendarConnectBanner(message: message)
-                }
-                HubList(items: hub.visibleEvents, empty: ("calendar", "No events the next \(hub.settings.calendarDays) days")) { event in
-                    HubEventRow(event: event)
-                }
-            }
+            CalendarGridView()
         case .approvals:
             HubList(items: hub.visibleApprovals,
                     empty: ("checkmark.seal", hub.settings.pendingApprovalsOnly ? "No approvals waiting" : "No approvals")) { approval in
