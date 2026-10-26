@@ -49,16 +49,16 @@ struct TemperatureRow: View {
                 .frame(width: 70, height: 24)
         }
         .animation(.easeInOut(duration: 0.4), value: reading?.cpu)
-        .help("Temperatures update every few seconds")
+        .help("Temperaturen uppdateras med några sekunders mellanrum")
     }
 
     private func otherSensors(_ reading: ThermalService.Reading?) -> String {
-        guard let reading else { return "Reading sensors…" }
+        guard let reading else { return "Läser sensorer…" }
         var parts: [String] = []
         if let gpu = reading.gpu { parts.append("GPU \(Int(gpu.rounded()))°") }
-        if let battery = reading.battery { parts.append("Battery \(Int(battery.rounded()))°") }
+        if let battery = reading.battery { parts.append("Batteri \(Int(battery.rounded()))°") }
         if let ssd = reading.ssd { parts.append("SSD \(Int(ssd.rounded()))°") }
-        return parts.isEmpty ? "Apple silicon sensors" : parts.joined(separator: "  ·  ")
+        return parts.isEmpty ? "Apple silicon-sensorer" : parts.joined(separator: "  ·  ")
     }
 }
 
@@ -125,7 +125,7 @@ struct CompactThermalView: View {
         .foregroundStyle(ThermalService.color(for: thermal.reading?.cpu, threshold: model.settings.hotThreshold))
         .lineLimit(1)
         .fixedSize()
-        .help("CPU temperature")
+        .help("CPU-temperatur")
     }
 
     private func batteryLabel(_ battery: ThermalService.Battery) -> some View {
@@ -163,13 +163,13 @@ struct BatteryBadge: View {
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
             }
-            Text(battery.timeText ?? (battery.isOnPower ? (battery.isCharging ? "Charging" : "On power") : "On battery"))
+            Text(battery.timeText ?? (battery.isOnPower ? (battery.isCharging ? "Laddar" : "På ström") : "På batteri"))
                 .font(.system(size: 10))
                 .foregroundStyle(.white.opacity(0.45))
                 .lineLimit(1)
         }
         .fixedSize()
-        .help(battery.isCharging ? "Charging" : (battery.isOnPower ? "Connected to power" : "On battery"))
+        .help(battery.isCharging ? "Laddar" : (battery.isOnPower ? "Ansluten till ström" : "På batteri"))
     }
 }
 
@@ -189,7 +189,7 @@ struct ThermalAlertView: View {
                     .symbolEffect(.bounce, value: bounce)
                     .frame(width: 36)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Your Mac is running hot")
+                    Text("Din Mac går varm")
                         .font(.system(size: 13.5, weight: .semibold))
                         .foregroundStyle(.white)
                     Text("CPU \(thermal.cpuText) · \(thermal.thermalTitle)")

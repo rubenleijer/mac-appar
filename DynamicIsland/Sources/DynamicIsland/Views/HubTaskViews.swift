@@ -50,7 +50,7 @@ struct HubTaskRow: View {
                             Image(systemName: "stop.fill").font(.system(size: 10, weight: .bold))
                         }
                         .buttonStyle(IslandButtonStyle(diameter: 24))
-                        .help("Stop and log the time")
+                        .help("Stoppa och logga tiden")
                         .transition(.opacity)
                     }
                 } else if isHovering {
@@ -58,7 +58,7 @@ struct HubTaskRow: View {
                         Image(systemName: "play.fill").font(.system(size: 10, weight: .bold))
                     }
                     .buttonStyle(IslandButtonStyle(diameter: 24))
-                    .help("Start a timer")
+                    .help("Starta en timer")
                     .transition(.opacity)
                 }
                 if isHovering && !isTiming {
@@ -66,7 +66,7 @@ struct HubTaskRow: View {
                         Image(systemName: "clock.badge.checkmark").font(.system(size: 10.5, weight: .semibold))
                     }
                     .buttonStyle(IslandButtonStyle(diameter: 24))
-                    .help("Log time")
+                    .help("Logga tid")
                     .transition(.opacity)
                 }
                 if isHovering && !isTiming {
@@ -74,7 +74,7 @@ struct HubTaskRow: View {
                         Image(systemName: "trash").font(.system(size: 10.5, weight: .semibold))
                     }
                     .buttonStyle(IslandButtonStyle(diameter: 24))
-                    .help("Delete")
+                    .help("Ta bort")
                     .transition(.opacity)
                 }
                 // Initials give way first when the island is narrow.
@@ -120,7 +120,7 @@ struct HubTaskRow: View {
         } else if let minutes = task.estimateMinutes {
             parts.append(estimateText(minutes))
         }
-        if task.status == HubTaskStatus.inProgress.rawValue { parts.append("In progress") }
+        if task.status == HubTaskStatus.inProgress.rawValue { parts.append("Pågår") }
         return HStack(spacing: 6) {
             if let day = style.dayText {
                 Text(day)
@@ -223,7 +223,7 @@ private struct TaskCheckCircle: View {
         .onHover { isHovering = $0 }
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovering)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDone)
-        .help("Mark as done")
+        .help("Markera som klar")
     }
 }
 
@@ -288,7 +288,7 @@ private struct TimerChip: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .help(isPaused ? "Resume the timer" : "Pause the timer")
+        .help(isPaused ? "Fortsätt timern" : "Pausa timern")
     }
 }
 
@@ -305,43 +305,43 @@ private struct TaskMenuItems: View {
 
     var body: some View {
         let hub = model.hub
-        Button("Open") { hub.select(task) }
-        Button("Mark as Done") { hub.complete(task) }
-        Button(task.status == HubTaskStatus.inProgress.rawValue ? "Move Back to To Do" : "Mark as In Progress") {
+        Button("Öppna") { hub.select(task) }
+        Button("Markera som klar") { hub.complete(task) }
+        Button(task.status == HubTaskStatus.inProgress.rawValue ? "Flytta tillbaka till Att göra" : "Markera som pågående") {
             hub.toggleInProgress(task)
         }
         if let timer = hub.timer, timer.taskID == task.id {
-            Button(timer.isPaused ? "Resume Timer" : "Pause Timer") { timer.isPaused ? hub.resumeTimer() : hub.pauseTimer() }
-            Button("Stop Timer and Log") { hub.stopTimer() }
-            Button("Stop Timer and Mark as Done") { hub.stopTimer(completeTask: true) }
+            Button(timer.isPaused ? "Fortsätt timer" : "Pausa timer") { timer.isPaused ? hub.resumeTimer() : hub.pauseTimer() }
+            Button("Stoppa och logga") { hub.stopTimer() }
+            Button("Stoppa och markera som klar") { hub.stopTimer(completeTask: true) }
         } else {
-            Button("Start Timer") { hub.startTimer(task) }
+            Button("Starta timer") { hub.startTimer(task) }
         }
-        Menu("Log Time") {
+        Menu("Logga tid") {
             ForEach(LogTimeChoice.minutes, id: \.self) { minutes in
                 Button(LogTimeChoice.title(minutes)) { hub.logTime(minutes, on: task) }
             }
             Divider()
-            Button("Other…") { LogTimeChoice.askCustom(task: task, hub: hub) }
+            Button("Annat…") { LogTimeChoice.askCustom(task: task, hub: hub) }
         }
         Divider()
-        Menu("Due") {
+        Menu("Datum") {
             ForEach(DueChoice.allCases) { choice in
                 Button(choice.title) { hub.reschedule(task, to: choice.date) }
             }
         }
-        Menu("Priority") {
+        Menu("Prioritet") {
             ForEach(Array(HubPriority.allCases.reversed())) { priority in
-                Button(priority == .none ? "No priority" : priority.title) { hub.setPriority(task, priority) }
+                Button(priority == .none ? "Ingen prioritet" : priority.title) { hub.setPriority(task, priority) }
             }
         }
-        Button("Edit…") { model.onEditTask?(task, false) }
-        Button("Add Checklist Item…") { model.onEditTask?(task, true) }
+        Button("Redigera…") { model.onEditTask?(task, false) }
+        Button("Lägg till checklistpunkt…") { model.onEditTask?(task, true) }
         Divider()
-        Button("Open in Acord Hub") { hub.openTask(task) }
-        Button("Copy Title") { copyToPasteboard(task.title) }
+        Button("Öppna i Acord Hub") { hub.openTask(task) }
+        Button("Kopiera titel") { copyToPasteboard(task.title) }
         Divider()
-        Button("Delete…") { hub.delete(task) }
+        Button("Ta bort…") { hub.delete(task) }
     }
 }
 
@@ -350,10 +350,10 @@ enum DueChoice: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .today: "Today"
-        case .tomorrow: "Tomorrow"
-        case .nextWeek: "In a week"
-        case .none: "No due date"
+        case .today: "Idag"
+        case .tomorrow: "Imorgon"
+        case .nextWeek: "Om en vecka"
+        case .none: "Inget datum"
         }
     }
     var date: Date? {
@@ -409,7 +409,7 @@ struct HubTaskDetailView: View {
                 Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
-            .help("Back to the list")
+            .help("Tillbaka till listan")
             Text(task.title)
                 .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(.white)
@@ -426,22 +426,22 @@ struct HubTaskDetailView: View {
         let hub = model.hub
         let due = taskDueText(task, now: hub.now)
         return HStack(spacing: 6) {
-            Chip(title: task.priority == .none ? "No priority" : task.priority.title, symbol: "flag.fill",
+            Chip(title: task.priority == .none ? "Ingen prioritet" : task.priority.title, symbol: "flag.fill",
                  tint: task.priority.cardColor) {
                 let entries: [IslandMenu.Entry] = HubPriority.allCases.reversed().map { priority in
-                    IslandMenu.Entry.item(priority == .none ? "No priority" : priority.title,
+                    IslandMenu.Entry.item(priority == .none ? "Ingen prioritet" : priority.title,
                                           checked: priority == task.priority,
                                           action: { hub.setPriority(task, priority) })
                 }
                 IslandMenu.show(entries)
             }
-            Chip(title: due.text ?? "No due date", symbol: "calendar", tint: due.text == nil ? .white.opacity(0.6) : due.color) {
+            Chip(title: due.text ?? "Inget datum", symbol: "calendar", tint: due.text == nil ? .white.opacity(0.6) : due.color) {
                 let entries: [IslandMenu.Entry] = DueChoice.allCases.map { choice in
                     IslandMenu.Entry.item(choice.title, checked: false, action: { hub.reschedule(task, to: choice.date) })
                 }
                 IslandMenu.show(entries)
             }
-            Chip(title: task.status == HubTaskStatus.inProgress.rawValue ? "In progress" : "To do",
+            Chip(title: task.status == HubTaskStatus.inProgress.rawValue ? "Pågår" : "Att göra",
                  symbol: task.status == HubTaskStatus.inProgress.rawValue ? "circle.lefthalf.filled" : "circle",
                  tint: task.status == HubTaskStatus.inProgress.rawValue ? .blue : .white.opacity(0.6)) {
                 hub.toggleInProgress(task)
@@ -459,7 +459,7 @@ struct HubTaskDetailView: View {
         let hub = model.hub
         let isTiming = hub.timer?.taskID == task.id
         return HStack(spacing: 6) {
-            Chip(title: "Done", symbol: "checkmark", tint: .green, filled: true) { hub.complete(task) }
+            Chip(title: "Klar", symbol: "checkmark", tint: .green, filled: true) { hub.complete(task) }
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let elapsed = hub.timer.map { $0.elapsed(at: context.date) } ?? 0
                 if isTiming, let timer = hub.timer {
@@ -468,33 +468,33 @@ struct HubTaskDetailView: View {
                              tint: timer.isPaused ? .orange : .green, monospaced: true) {
                             timer.isPaused ? hub.resumeTimer() : hub.pauseTimer()
                         }
-                        Chip(title: "Stop", symbol: "stop.fill", tint: .white) { hub.stopTimer() }
+                        Chip(title: "Stoppa", symbol: "stop.fill", tint: .white) { hub.stopTimer() }
                     }
                 } else {
-                    Chip(title: "Start timer", symbol: "play.fill", tint: .white) { hub.startTimer(task) }
+                    Chip(title: "Starta timer", symbol: "play.fill", tint: .white) { hub.startTimer(task) }
                 }
             }
             .fixedSize()
-            Chip(title: "Log", symbol: "clock.badge.checkmark", tint: .white) { LogTimeChoice.showMenu(task: task, hub: hub) }
-            Chip(title: "Edit", symbol: "pencil", tint: .white) { model.onEditTask?(task, false) }
-            Chip(title: "Item", symbol: "plus", tint: .white) { model.onEditTask?(task, true) }
+            Chip(title: "Logg", symbol: "clock.badge.checkmark", tint: .white) { LogTimeChoice.showMenu(task: task, hub: hub) }
+            Chip(title: "Redigera", symbol: "pencil", tint: .white) { model.onEditTask?(task, false) }
+            Chip(title: "Punkt", symbol: "plus", tint: .white) { model.onEditTask?(task, true) }
             Spacer(minLength: 0)
             Button { hub.openTask(task) } label: {
                 Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .bold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
-            .help("Open in Acord Hub")
+            .help("Öppna i Acord Hub")
             Button {
                 IslandMenu.show([
-                    .item("Copy Title", checked: false, action: { copyToPasteboard(task.title) }),
+                    .item("Kopiera titel", checked: false, action: { copyToPasteboard(task.title) }),
                     .separator,
-                    .item("Delete…", checked: false, action: { hub.delete(task) }),
+                    .item("Ta bort…", checked: false, action: { hub.delete(task) }),
                 ])
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 11, weight: .bold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
-            .help("More")
+            .help("Mer")
         }
     }
 
@@ -504,7 +504,7 @@ struct HubTaskDetailView: View {
         if let items = hub.detail?.checklist, !items.isEmpty {
             let done = items.filter(\.isDone).count
             VStack(alignment: .leading, spacing: 2) {
-                Text("Checklist \(done)/\(items.count)")
+                Text("Checklista \(done)/\(items.count)")
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.45))
                     .padding(.bottom, 2)
@@ -513,7 +513,7 @@ struct HubTaskDetailView: View {
                 }
             }
         } else if !hub.isLoadingDetail && (task.detail ?? "").isEmpty {
-            Text("No description or checklist")
+            Text("Ingen beskrivning eller checklista")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.white.opacity(0.35))
         }
@@ -548,7 +548,7 @@ private struct ChecklistRow: View {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 18))
-                .help("Remove item")
+                .help("Ta bort punkt")
             }
         }
         .frame(minHeight: 22)
@@ -592,10 +592,10 @@ private struct Chip: View {
 func taskDueText(_ task: HubTask, now: Date) -> (text: String?, color: Color) {
     guard let days = task.daysLeft(now: now), let due = task.dueDay else { return (nil, .white.opacity(0.5)) }
     if days < 0 {
-        return (days == -1 ? "Overdue since yesterday" : "Overdue \(-days) days", Color(red: 1, green: 0.42, blue: 0.4))
+        return (days == -1 ? "Försenad sedan igår" : "Försenad \(-days) dagar", Color(red: 1, green: 0.42, blue: 0.4))
     }
-    if days == 0 { return ("Due today", .orange) }
-    return ("Due " + AcordHubService.dayName(due, now: now), .white.opacity(0.5))
+    if days == 0 { return ("Idag", .orange) }
+    return ("Senast " + AcordHubService.dayName(due, now: now), .white.opacity(0.5))
 }
 
 /// "4:05" or "1:02:30".
@@ -652,22 +652,22 @@ enum LogTimeChoice {
 
     static func showMenu(task: HubTask, hub: AcordHubService) {
         var entries: [IslandMenu.Entry] = minutes.map { amount in
-            IslandMenu.Entry.item("Log " + title(amount), checked: false, action: { hub.logTime(amount, on: task) })
+            IslandMenu.Entry.item("Logga " + title(amount), checked: false, action: { hub.logTime(amount, on: task) })
         }
         entries.append(.separator)
-        entries.append(.item("Other…", checked: false, action: { askCustom(task: task, hub: hub) }))
+        entries.append(.item("Annat…", checked: false, action: { askCustom(task: task, hub: hub) }))
         IslandMenu.show(entries)
     }
 
     /// Asks for minutes (or "1:30", "1.5h") and an optional note.
     static func askCustom(task: HubTask, hub: AcordHubService) {
         let alert = NSAlert()
-        alert.messageText = "Log time on “\(task.title)”"
-        alert.informativeText = "Minutes, or hours like 1:30 or 1.5h."
+        alert.messageText = "Logga tid på ”\(task.title)”"
+        alert.informativeText = "Minuter, eller timmar som 1:30 eller 1,5h."
         let amount = NSTextField(string: "")
         amount.placeholderString = "30"
         let note = NSTextField(string: "")
-        note.placeholderString = "Note (optional)"
+        note.placeholderString = "Anteckning (valfritt)"
         let stack = NSStackView(views: [amount, note])
         stack.orientation = .vertical
         stack.spacing = 8
@@ -675,8 +675,8 @@ enum LogTimeChoice {
         amount.frame.size.width = 260
         note.frame.size.width = 260
         alert.accessoryView = stack
-        alert.addButton(withTitle: "Log")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Logg")
+        alert.addButton(withTitle: "Avbryt")
         alert.window.initialFirstResponder = amount
         NSApp.activate()
         guard alert.runModal() == .alertFirstButtonReturn, let minutes = parse(amount.stringValue) else { return }

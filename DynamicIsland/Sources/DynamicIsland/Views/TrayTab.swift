@@ -10,7 +10,7 @@ struct TrayTab: View {
         let tray = model.tray
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(tray.items.isEmpty ? "Tray" : (tray.items.count == 1 ? "1 item" : "\(tray.items.count) items"))
+                Text(tray.items.isEmpty ? "Tray" : (tray.items.count == 1 ? "1 objekt" : "\(tray.items.count) objekt"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.5))
                 if tray.isImporting { ProgressView().controlSize(.mini) }
@@ -19,12 +19,12 @@ struct TrayTab: View {
                     Image(systemName: "folder").font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 24))
-                .help("Open the tray folder")
+                .help("Öppna trayens mapp")
                 Button { tray.clear() } label: {
                     Image(systemName: "trash").font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 24))
-                .help("Move everything in the tray to the Trash")
+                .help("Flytta allt i trayen till papperskorgen")
                 .disabled(tray.items.isEmpty)
             }
             .frame(height: 24)
@@ -40,9 +40,9 @@ struct TrayTab: View {
                         Image(systemName: "tray.and.arrow.down.fill")
                             .font(.system(size: 22, weight: .medium))
                             .symbolEffect(.bounce, value: isTargeted)
-                        Text(isTargeted ? "Drop to keep it here" : "Drop files, images or links here")
+                        Text(isTargeted ? "Släpp för att spara här" : "Släpp filer, bilder eller länkar här")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("Drag them out again wherever you need them")
+                        Text("Dra ut dem igen där du behöver dem")
                             .font(.system(size: 11))
                             .foregroundStyle(.white.opacity(0.45))
                     }
@@ -106,7 +106,7 @@ private struct TrayTile: View {
                 .buttonStyle(IslandButtonStyle(diameter: 18))
                 .background(Circle().fill(Color(white: 0.25)))
                 .offset(x: 2, y: -2)
-                .help("Remove from the tray")
+                .help("Ta bort från trayen")
                 .transition(.scale.combined(with: .opacity))
             }
         }
@@ -116,12 +116,12 @@ private struct TrayTile: View {
         .onDrag { NSItemProvider(contentsOf: item.url) ?? NSItemProvider() }
         .onTapGesture(count: 2) { tray.open(item) }
         .contextMenu {
-            Button("Open") { tray.open(item) }
-            Button("Show in Finder") { tray.reveal(item) }
-            Button("Copy") { tray.copyToPasteboard(item) }
+            Button("Öppna") { tray.open(item) }
+            Button("Visa i Finder") { tray.reveal(item) }
+            Button("Kopiera") { tray.copyToPasteboard(item) }
             Divider()
-            Button("Remove from Tray") { tray.remove(item) }
+            Button("Ta bort från trayen") { tray.remove(item) }
         }
-        .help("\(item.url.lastPathComponent) – drag it out, or double-click to open")
+        .help("\(item.url.lastPathComponent) – dra ut den eller dubbelklicka för att öppna")
     }
 }

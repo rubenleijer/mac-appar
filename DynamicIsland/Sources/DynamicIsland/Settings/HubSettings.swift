@@ -9,11 +9,11 @@ enum HubSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .tasks: "Tasks"
-        case .calendar: "Calendar"
-        case .approvals: "Approvals"
-        case .content: "Content"
-        case .notifications: "Notifications"
+        case .tasks: "Uppgifter"
+        case .calendar: "Kalender"
+        case .approvals: "Godkännanden"
+        case .content: "Innehåll"
+        case .notifications: "Notiser"
         }
     }
 
@@ -33,9 +33,9 @@ enum HubTaskScope: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .mine: "Assigned to me"
-        case .unassignedAndMine: "Mine and unassigned"
-        case .all: "Everyone’s"
+        case .mine: "Tilldelade mig"
+        case .unassignedAndMine: "Mina och otilldelade"
+        case .all: "Allas"
         }
     }
 }
@@ -46,9 +46,9 @@ enum HubTaskStatus: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .todo: "To do"
-        case .inProgress: "In progress"
-        case .unclear: "Unclear"
+        case .todo: "Att göra"
+        case .inProgress: "Pågår"
+        case .unclear: "Oklar"
         }
     }
 }
@@ -59,11 +59,11 @@ enum HubPriority: String, CaseIterable, Identifiable, Comparable {
     var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
     var title: String {
         switch self {
-        case .none: "Any"
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        case .dangerous: "Critical"
+        case .none: "Alla"
+        case .low: "Låg"
+        case .medium: "Medel"
+        case .high: "Hög"
+        case .dangerous: "Kritisk"
         }
     }
     static func < (lhs: Self, rhs: Self) -> Bool { lhs.rank < rhs.rank }
@@ -85,8 +85,8 @@ enum IslandStartTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .lastUsed: "Last used tab"
-        case .media: "Now Playing"
+        case .lastUsed: "Senast använda flik"
+        case .media: "Spelas nu"
         case .hub: "Acord Hub"
         }
     }

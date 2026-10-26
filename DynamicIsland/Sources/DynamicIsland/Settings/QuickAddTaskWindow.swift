@@ -21,7 +21,7 @@ final class QuickAddTaskController {
             window.contentViewController = hosting
         } else {
             let window = NSWindow(contentViewController: hosting)
-            window.title = "New Task in Acord Hub"
+            window.title = "Ny uppgift i Acord Hub"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.level = .floating
@@ -43,11 +43,11 @@ private struct QuickAddTaskView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .none: "None"
-            case .today: "Today"
-            case .tomorrow: "Tomorrow"
-            case .nextWeek: "In a week"
-            case .custom: "Date…"
+            case .none: "Inget"
+            case .today: "Idag"
+            case .tomorrow: "Imorgon"
+            case .nextWeek: "Om en vecka"
+            case .custom: "Datum…"
             }
         }
     }
@@ -67,14 +67,14 @@ private struct QuickAddTaskView: View {
     var body: some View {
         let hub = model.hub
         Form {
-            TextField("Title", text: $title, prompt: Text("What needs doing?"))
+            TextField("Titel", text: $title, prompt: Text("Vad behöver göras?"))
                 .focused($isTitleFocused)
                 .onSubmit(save)
-            Picker("Due", selection: $due) {
+            Picker("Datum", selection: $due) {
                 ForEach(Due.allCases) { Text($0.title).tag($0) }
             }
             if due == .custom {
-                DatePicker("Date", selection: $customDate, displayedComponents: .date)
+                DatePicker("Datum", selection: $customDate, displayedComponents: .date)
             }
             Picker("Prioritet", selection: $priority) {
                 ForEach(Array(HubPriority.allCases.reversed())) { level in
@@ -86,17 +86,17 @@ private struct QuickAddTaskView: View {
                 }
             }
             .pickerStyle(.menu)
-            Picker("Project", selection: $projectID) {
-                Text("No project").tag("")
+            Picker("Projekt", selection: $projectID) {
+                Text("Inget projekt").tag("")
                 ForEach(hub.projects) { project in
                     Text(project.clientName.map { $0 == project.name ? project.name : "\(project.name) – \($0)" } ?? project.name)
                         .tag(project.id)
                 }
             }
-            Picker("Assignee", selection: $assigneeID) {
-                Text("Unassigned").tag("")
+            Picker("Ansvarig", selection: $assigneeID) {
+                Text("Ingen").tag("")
                 ForEach(hub.team) { member in
-                    Text(member.id == hub.settings.memberID ? "\(member.name) (me)" : member.name).tag(member.id)
+                    Text(member.id == hub.settings.memberID ? "\(member.name) (jag)" : member.name).tag(member.id)
                 }
             }
             HStack {
@@ -106,9 +106,9 @@ private struct QuickAddTaskView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                Button("Cancel", role: .cancel, action: onClose)
+                Button("Avbryt", role: .cancel, action: onClose)
                     .keyboardShortcut(.cancelAction)
-                Button(isSaving ? "Creating…" : "Create Task", action: save)
+                Button(isSaving ? "Skapar…" : "Skapa uppgift", action: save)
                     .keyboardShortcut(.defaultAction)
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
             }

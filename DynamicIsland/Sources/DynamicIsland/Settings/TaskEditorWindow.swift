@@ -27,7 +27,7 @@ final class TaskEditorController {
             window.level = .floating
             self.window = window
         }
-        window?.title = focusChecklist ? "Add to Checklist" : "Edit Task"
+        window?.title = focusChecklist ? "Lägg till i checklistan" : "Redigera uppgift"
         if let window {
             let frame = (NotchMetrics.preferredScreen() ?? NSScreen.main)?.visibleFrame ?? .zero
             let size = window.frame.size
@@ -57,10 +57,10 @@ private struct TaskEditorView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Title", text: $title)
+                TextField("Titel", text: $title)
                     .focused($focus, equals: .title)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Description").foregroundStyle(.secondary)
+                    Text("Beskrivning").foregroundStyle(.secondary)
                     TextEditor(text: $text)
                         .font(.body)
                         .frame(height: 110)
@@ -69,7 +69,7 @@ private struct TaskEditorView: View {
                         .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
                 }
             }
-            Section("Checklist") {
+            Section("Checklista") {
                 ForEach(model.hub.detail?.task.id == task.id ? model.hub.detail?.checklist ?? [] : []) { item in
                     Label(item.title, systemImage: item.isDone ? "checkmark.square.fill" : "square")
                         .foregroundStyle(item.isDone ? HierarchicalShapeStyle.secondary : HierarchicalShapeStyle.primary)
@@ -78,10 +78,10 @@ private struct TaskEditorView: View {
                     Label(item, systemImage: "square").foregroundStyle(.secondary)
                 }
                 HStack {
-                    TextField("New item", text: $newItem, prompt: Text("Add an item and press Return"))
+                    TextField("Ny punkt", text: $newItem, prompt: Text("Skriv en punkt och tryck Retur"))
                         .focused($focus, equals: .item)
                         .onSubmit(addItem)
-                    Button("Add", action: addItem)
+                    Button("Lägg till", action: addItem)
                         .disabled(newItem.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
                 }
             }
@@ -92,9 +92,9 @@ private struct TaskEditorView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                Button("Cancel", role: .cancel, action: onClose)
+                Button("Avbryt", role: .cancel, action: onClose)
                     .keyboardShortcut(.cancelAction)
-                Button(isSaving ? "Saving…" : "Save", action: save)
+                Button(isSaving ? "Sparar…" : "Spara", action: save)
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
             }
@@ -119,7 +119,7 @@ private struct TaskEditorView: View {
                 added.append(item)
                 newItem = ""
             } else {
-                error = "Couldn’t add the item"
+                error = "Kunde inte lägga till punkten"
             }
             isSaving = false
             focus = .item
@@ -138,7 +138,7 @@ private struct TaskEditorView: View {
                 succeeded = await model.hub.addChecklistItem(to: task.id, title: pending)
             }
             isSaving = false
-            if succeeded { onClose() } else { error = "Couldn’t save the task" }
+            if succeeded { onClose() } else { error = "Kunde inte spara uppgiften" }
         }
     }
 }

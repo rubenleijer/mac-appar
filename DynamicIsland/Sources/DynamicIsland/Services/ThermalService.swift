@@ -36,7 +36,7 @@ final class ThermalService {
         var timeText: String? {
             guard let minutesLeft, minutesLeft > 0 else { return nil }
             let text = minutesLeft >= 60 ? "\(minutesLeft / 60) h \(minutesLeft % 60) min" : "\(minutesLeft) min"
-            return isCharging ? "\(text) to full" : "\(text) left"
+            return isCharging ? "\(text) till full" : "\(text) kvar"
         }
     }
 
@@ -75,10 +75,10 @@ final class ThermalService {
     var thermalTitle: String {
         switch reading?.thermalState ?? .nominal {
         case .nominal: "Normal"
-        case .fair: "Warm"
-        case .serious: "Hot"
-        case .critical: "Very hot"
-        @unknown default: "Unknown"
+        case .fair: "Ljummen"
+        case .serious: "Varm"
+        case .critical: "Mycket varm"
+        @unknown default: "Okänd"
         }
     }
 

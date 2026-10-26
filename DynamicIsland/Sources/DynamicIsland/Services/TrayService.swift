@@ -83,14 +83,14 @@ final class TrayService {
         }
         if let imageType = provider.registeredTypeIdentifiers.compactMap({ UTType($0) }).first(where: { $0.conforms(to: .image) }),
            let data = await loadData(provider, type: imageType) {
-            let name = (provider.suggestedName ?? "Image") + "." + (imageType.preferredFilenameExtension ?? "png")
+            let name = (provider.suggestedName ?? "Bild") + "." + (imageType.preferredFilenameExtension ?? "png")
             write(data, named: name, into: folder)
             return
         }
         if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier), let url = await loadURL(provider, type: .url) {
             let plist: [String: String] = ["URL": url.absoluteString]
             if let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0) {
-                write(data, named: (url.host ?? "Link") + ".webloc", into: folder)
+                write(data, named: (url.host ?? "Länk") + ".webloc", into: folder)
             }
             return
         }

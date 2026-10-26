@@ -185,7 +185,7 @@ final class AcordHubService {
             return HubLiveItem(kind: .post, title: post.title, date: post.date)
         }
         if settings.liveShowsOverdue, overdueCount > 0 {
-            return HubLiveItem(kind: .overdue, title: "Overdue", count: overdueCount)
+            return HubLiveItem(kind: .overdue, title: "Försenad", count: overdueCount)
         }
         return nil
     }
@@ -284,7 +284,7 @@ final class AcordHubService {
                 var arguments: [String: HubArgument] = ["from": .string(from), "to": .string(to)]
                 if !settings.memberID.isEmpty { arguments["user_id"] = .string(settings.memberID) }
                 let data = try await client.call("dashboard_snapshot", arguments)
-                guard let snapshot = Self.object(data) else { throw HubError("The Hub sent an unreadable snapshot") }
+                guard let snapshot = Self.object(data) else { throw HubError("Hubben skickade ett oläsbart svar") }
                 guard !Task.isCancelled else { return }
                 approvalsMissing = !apply(snapshot: snapshot)
             } else {
@@ -345,7 +345,7 @@ final class AcordHubService {
             } else if let error = meetings["error"] as? String {
                 HubLog.write("meetings: \(error)")
             } else {
-                calendarConnection = .notConnected(meetings["message"] as? String ?? "Google Calendar isn’t connected",
+                calendarConnection = .notConnected(meetings["message"] as? String ?? "Google Kalender är inte kopplad",
                                                    meetings["connect_path"] as? String ?? "/api/google/calendar/connect")
             }
         }
@@ -567,10 +567,10 @@ final class AcordHubService {
 
     func complete(_ task: HubTask) {
         if settings.confirmComplete,
-           !Self.confirm("Mark “\(task.title)” as done?", button: "Mark as Done") { return }
+           !Self.confirm("Markera ”\(task.title)” som klar?", button: "Markera som klar") { return }
         if timer?.taskID == task.id { stopTimer() }
         if selectedTaskID == task.id { select(nil) }
-        setStatus(task, "DONE", toast: "Done: \(task.title)", undoable: true)
+        setStatus(task, "DONE", toast: "Klar: \(task.title)", undoable: true)
     }
 
     func toggleInProgress(_ task: HubTask) {
@@ -602,9 +602,9 @@ final class AcordHubService {
         let value: HubArgument = newDay.map { HubArgument.string(HubDate.dayString($0)) } ?? HubArgument.null
         write(task.id, ["due_date": value]) { $0.dueDay = old }
         if let newDay {
-            showToast("Moved to \(Self.dayName(newDay, now: now)): \(task.title)")
+            showToast("Flyttad till \(Self.dayName(newDay, now: now)): \(task.title)")
         } else {
-            showToast("Due date removed: \(task.title)")
+            showToast("Datum borttaget: \(task.title)")
         }
     }
 
@@ -630,7 +630,7 @@ final class AcordHubService {
     }
 
     func delete(_ task: HubTask) {
-        guard Self.confirm("Delete “\(task.title)”?", detail: "It’s removed from Acord Hub for good.", button: "Delete") else { return }
+        guard Self.confirm("Ta bort ”\(task.title)”?", detail: "Den tas bort från Acord Hub för gott.", button: "Ta bort") else { return }
         if timer?.taskID == task.id { cancelTimer() }
         if selectedTaskID == task.id { select(nil) }
         let snapshot = tasks
@@ -639,7 +639,7 @@ final class AcordHubService {
             if await perform("delete_task", ["task_id": .string(task.id)], busy: task.id) == nil {
                 tasks = snapshot
             } else {
-                showToast("Deleted: \(task.title)")
+                showToast("Borttagen: \(task.title)")
             }
         }
     }
@@ -738,7 +738,7 @@ final class AcordHubService {
             defaults.set(trackedTime, forKey: Self.trackedKey)
             timer = nil
             saveTimer()
-            if !silently { showToast("Tracked \(Self.durationText(elapsed)) on \(current.title) – on this Mac only") }
+            if !silently { showToast("Mätte \(Self.durationText(elapsed)) på \(current.title) – bara på den här Macen") }
             return
         }
         timer = nil
@@ -752,7 +752,7 @@ final class AcordHubService {
             let json = Self.object(data)
             if !silently {
                 let logged = (json?["logged_ms"] as? NSNumber).map { $0.doubleValue / 1000 } ?? current.elapsed(at: Date())
-                showToast("Logged \(Self.durationText(logged)) on \(current.title)")
+                showToast("Loggade \(Self.durationText(logged)) på \(current.title)")
             }
             refreshTimeToday()
             if completeTask { refresh(force: true) }
@@ -768,7 +768,7 @@ final class AcordHubService {
         Task {
             if let data = await perform("pause_timer", ["user_id": .string(settings.memberID)], busy: current.taskID) {
                 if let dto = Self.object(data)?["timer"] as? [String: Any], let hubTimer = HubTimer(hub: dto) { timer = hubTimer }
-                showToast("Paused – \(Self.durationText(elapsed)) logged")
+                showToast("Pausad – \(Self.durationText(elapsed)) loggat")
                 refreshTimeToday()
             } else {
                 current.pausedElapsed = nil
@@ -806,7 +806,7 @@ final class AcordHubService {
         guard canUseHubTime else {
             trackedTime[task.id, default: 0] += TimeInterval(minutes * 60)
             defaults.set(trackedTime, forKey: Self.trackedKey)
-            showToast("Logged \(Self.durationText(TimeInterval(minutes * 60))) – on this Mac only")
+            showToast("Loggade \(Self.durationText(TimeInterval(minutes * 60))) – bara på den här Macen")
             return
         }
         Task {
@@ -814,7 +814,7 @@ final class AcordHubService {
                                                     "minutes": .int(minutes)]
             if let note, !note.isEmpty { arguments["note"] = .string(note) }
             guard await perform("log_time", arguments, busy: task.id) != nil else { return }
-            showToast("Logged \(Self.durationText(TimeInterval(minutes * 60))) on \(task.title)")
+            showToast("Loggade \(Self.durationText(TimeInterval(minutes * 60))) på \(task.title)")
             refreshTimeToday()
         }
     }
@@ -868,7 +868,7 @@ final class AcordHubService {
 
     nonisolated static func durationText(_ seconds: TimeInterval) -> String {
         let minutes = Int(seconds / 60)
-        if minutes < 1 { return "under a minute" }
+        if minutes < 1 { return "under en minut" }
         if minutes < 60 { return "\(minutes) min" }
         return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
     }
@@ -928,7 +928,7 @@ final class AcordHubService {
         } catch {
             HubLog.write("\(tool) failed: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
             if showsErrors {
-                showToast("Couldn’t save: " + ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription))
+                showToast("Kunde inte spara: " + ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription))
             }
             return nil
         }
@@ -939,7 +939,7 @@ final class AcordHubService {
         alert.messageText = message
         if let detail { alert.informativeText = detail }
         alert.addButton(withTitle: button)
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Avbryt")
         NSApp.activate()
         return alert.runModal() == .alertFirstButtonReturn
     }
@@ -967,15 +967,15 @@ final class AcordHubService {
 
     /// Checks the connection from the settings window.
     func testConnection() async -> String {
-        guard let endpoint = settings.endpoint else { return "Enter a valid server address" }
-        guard !settings.token.isEmpty else { return "Enter a token" }
+        guard let endpoint = settings.endpoint else { return "Ange en giltig serveradress" }
+        guard !settings.token.isEmpty else { return "Ange en token" }
         await client.configure(.init(endpoint: endpoint, token: settings.token))
         do {
             let data = try await client.call("list_team")
             team = HubJSON.list(data, key: "team").compactMap { HubMember($0) }
             lastDirectoryLoad = Date()
             refresh(force: true)
-            return "Connected – \(team.count) team members"
+            return "Ansluten – \(team.count) i teamet"
         } catch {
             return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -1004,8 +1004,8 @@ final class AcordHubService {
 
     /// Shows a sample alert so the user can see their alert settings in action.
     func sendTestAlert() {
-        let alert = HubNotification(id: "test-\(UUID().uuidString)", kind: .eventSoon, title: "Test from Acord Hub",
-                                    detail: "This is how notifications look in the notch", date: Date(),
+        let alert = HubNotification(id: "test-\(UUID().uuidString)", kind: .eventSoon, title: "Test från Acord Hub",
+                                    detail: "Så här ser notiser ut i notchen", date: Date(),
                                     section: HubSection.notifications.rawValue)
         latestAlert = alert
         latestAlertBatch = 1
@@ -1044,7 +1044,7 @@ final class AcordHubService {
             for task in relevant where !known.contains(task.id) {
                 let from = clientName(for: task).map { " · \($0)" } ?? ""
                 fresh.append(.init(id: "new-\(task.id)", kind: .newTask, title: task.title,
-                                   detail: "New task" + from, date: now, section: HubSection.tasks.rawValue))
+                                   detail: "Ny uppgift" + from, date: now, section: HubSection.tasks.rawValue))
             }
         }
         knownTaskIDs = Set(tasks.map(\.id))
@@ -1056,7 +1056,7 @@ final class AcordHubService {
                     let old = previous[approval.id]
                     guard old != approval.status else { continue }
                     var parts = [approval.statusTitle]
-                    if old == nil { parts.insert("New approval", at: 0) }
+                    if old == nil { parts.insert("Nytt godkännande", at: 0) }
                     if let client = approval.clientName { parts.append(client) }
                     let detail = parts.joined(separator: " · ")
                     fresh.append(.init(id: "approval-\(approval.id)-\(approval.status)", kind: .approval,
@@ -1093,11 +1093,11 @@ final class AcordHubService {
             if days < 0 {
                 guard settings.notifyOverdue else { continue }
                 result.append(.init(id: "overdue-\(task.id)-\(HubDate.dayString(due))", kind: .overdue, title: task.title,
-                                    detail: "Overdue since \(Self.dayName(due, now: now))" + client, date: now,
+                                    detail: "Försenad sedan \(Self.dayName(due, now: now))" + client, date: now,
                                     section: HubSection.tasks.rawValue))
             } else if settings.notifyDueSoon, days <= settings.dueSoonDays {
                 result.append(.init(id: "due-\(task.id)-\(HubDate.dayString(due))", kind: .dueSoon, title: task.title,
-                                    detail: "Due \(Self.dayName(due, now: now))" + client, date: now,
+                                    detail: "Ska vara klar \(Self.dayName(due, now: now))" + client, date: now,
                                     section: HubSection.tasks.rawValue))
             }
         }
@@ -1108,7 +1108,7 @@ final class AcordHubService {
                 let minutes = max(Int((event.start.timeIntervalSince(now) / 60).rounded()), 1)
                 result.append(.init(id: "event-\(event.id)-\(Int(event.start.timeIntervalSince1970))", kind: .eventSoon,
                                     title: event.title,
-                                    detail: "Starts in \(minutes) min" + (event.location.map { " · \($0)" } ?? ""),
+                                    detail: "Börjar om \(minutes) min" + (event.location.map { " · \($0)" } ?? ""),
                                     date: now, section: HubSection.calendar.rawValue))
             }
         }
@@ -1120,7 +1120,7 @@ final class AcordHubService {
                 let minutes = max(Int((date.timeIntervalSince(now) / 60).rounded()), 1)
                 result.append(.init(id: "post-\(post.id)-\(Int(date.timeIntervalSince1970))", kind: .postSoon,
                                     title: post.title,
-                                    detail: "\(post.platformTitle) post goes out in \(minutes) min", date: now,
+                                    detail: "\(post.platformTitle)-inlägg publiceras om \(minutes) min", date: now,
                                     section: HubSection.content.rawValue))
             }
         }
@@ -1160,11 +1160,12 @@ final class AcordHubService {
 
     nonisolated static func dayName(_ day: Date, now: Date) -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return "today" }
-        if calendar.isDateInTomorrow(day) { return "tomorrow" }
-        if calendar.isDateInYesterday(day) { return "yesterday" }
+        if calendar.isDateInToday(day) { return "idag" }
+        if calendar.isDateInTomorrow(day) { return "imorgon" }
+        if calendar.isDateInYesterday(day) { return "igår" }
         let formatter = DateFormatter()
         let days = abs(calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: day).day ?? 99)
+        formatter.locale = Locale(identifier: "sv_SE")
         formatter.setLocalizedDateFormatFromTemplate(days < 7 ? "EEEE" : "d MMM")
         return formatter.string(from: day)
     }

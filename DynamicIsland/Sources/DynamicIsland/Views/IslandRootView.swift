@@ -24,9 +24,9 @@ struct IslandRootView: View {
             if presentation != .open { model.open() }
         }
         .contextMenu {
-            Button("Settings…") { model.onOpenSettings?() }
+            Button("Inställningar…") { model.onOpenSettings?() }
             Divider()
-            Button("Quit Dynamic Island") { NSApp.terminate(nil) }
+            Button("Avsluta Dynamic Island") { NSApp.terminate(nil) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(model.animation, value: presentation)

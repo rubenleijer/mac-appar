@@ -97,11 +97,11 @@ struct CompactHubView: View {
 
     private func label(_ item: HubLiveItem?) -> String {
         switch item?.kind {
-        case .ongoingEvent: "Now"
-        case .post: "Post"
-        case .overdue: "Late"
-        case .timer: "Focus"
-        default: "Next"
+        case .ongoingEvent: "Nu"
+        case .post: "Inlägg"
+        case .overdue: "Sent"
+        case .timer: "Fokus"
+        default: "Nästa"
         }
     }
 
@@ -114,11 +114,11 @@ struct CompactHubView: View {
             guard let timer = model.hub.timer else { return "" }
             return clockText(timer.elapsed(at: now))
         case .ongoingEvent:
-            guard let end = item.date else { return "Now" }
+            guard let end = item.date else { return "Nu" }
             return shortDuration(end.timeIntervalSince(now))
         case .event, .post:
             guard let date = item.date else { return "" }
-            return date <= now ? "Now" : shortDuration(date.timeIntervalSince(now))
+            return date <= now ? "Nu" : shortDuration(date.timeIntervalSince(now))
         }
     }
 }

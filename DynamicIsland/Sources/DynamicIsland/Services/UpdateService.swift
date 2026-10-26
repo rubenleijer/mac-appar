@@ -57,7 +57,7 @@ final class UpdateService {
         let repository = settings.updateRepository.trimmingCharacters(in: .whitespaces)
         let branch = settings.updateBranch.trimmingCharacters(in: .whitespaces)
         guard let url = URL(string: "https://api.github.com/repos/\(repository)/commits/\(branch)") else {
-            state = .failed("Invalid repository")
+            state = .failed("Ogiltigt repo")
             return
         }
         var request = URLRequest(url: url)
@@ -68,7 +68,7 @@ final class UpdateService {
             guard (response as? HTTPURLResponse)?.statusCode == 200,
                   let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let sha = json["sha"] as? String else {
-                state = .failed("GitHub didn’t answer (\((response as? HTTPURLResponse)?.statusCode ?? 0))")
+                state = .failed("GitHub svarade inte (\((response as? HTTPURLResponse)?.statusCode ?? 0))")
                 return
             }
             lastChecked = Date()
@@ -77,7 +77,7 @@ final class UpdateService {
                 return
             }
             let message = ((json["commit"] as? [String: Any])?["message"] as? String)?
-                .components(separatedBy: .newlines).first ?? "New version"
+                .components(separatedBy: .newlines).first ?? "Ny version"
             state = .available(message)
             if installIfAvailable, settings.autoInstallUpdates {
                 if canInstallNow() {
@@ -98,7 +98,7 @@ final class UpdateService {
     /// Runs the update script detached, so it survives this app being replaced.
     func install() {
         guard let bundled = Bundle.main.url(forResource: "update", withExtension: "sh") else {
-            state = .failed("The update script is missing from the app")
+            state = .failed("Uppdateringsskriptet saknas i appen")
             return
         }
         let script = FileManager.default.temporaryDirectory.appendingPathComponent("dynamic-island-update.sh")
@@ -107,7 +107,7 @@ final class UpdateService {
             try FileManager.default.copyItem(at: bundled, to: script)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
         } catch {
-            state = .failed("Couldn’t prepare the update: \(error.localizedDescription)")
+            state = .failed("Kunde inte förbereda uppdateringen: \(error.localizedDescription)")
             return
         }
         let quote = { (text: String) in "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'" }
@@ -122,7 +122,7 @@ final class UpdateService {
             // If this app is still running long after, the build failed; the log says why.
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(15 * 60))
-                if self?.state == .installing { self?.state = .failed("The update didn’t finish – see the log") }
+                if self?.state == .installing { self?.state = .failed("Uppdateringen blev inte klar – se loggen") }
             }
         } catch {
             state = .failed(error.localizedDescription)

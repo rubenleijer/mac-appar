@@ -70,7 +70,7 @@ struct HubTab: View {
                     .foregroundStyle(.white.opacity(0.55))
                     .labelStyle(.titleAndIcon)
                     .fixedSize()
-                    .help("Logged in Acord Hub today")
+                    .help("Loggat i Acord Hub idag")
             }
             if currentSection == .tasks && hub.selectedTaskID == nil {
                 TodayToggle(isOn: hub.settings.showsTodayOnly) {
@@ -88,14 +88,14 @@ struct HubTab: View {
                     Image(systemName: "checkmark.circle").font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 24))
-                .help("Mark all as read")
+                .help("Markera alla som lästa")
                 .disabled(hub.unreadCount == 0)
             } else if currentSection == .tasks {
                 Button { model.onQuickAddTask?() } label: {
                     Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 24))
-                .help("New task")
+                .help("Ny uppgift")
                 .disabled(!hub.isConfigured)
             }
             Button { hub.refresh(force: true) } label: {
@@ -110,16 +110,16 @@ struct HubTab: View {
                 Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .bold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
-            .help("Open Acord Hub")
+            .help("Öppna Acord Hub")
         }
         .frame(height: 26)
     }
 
     private var updatedText: String {
-        guard let date = model.hub.lastUpdated else { return "Refresh" }
+        guard let date = model.hub.lastUpdated else { return "Uppdatera" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
-        return "Updated \(formatter.localizedString(for: date, relativeTo: Date())) – click to refresh"
+        return "Uppdaterad \(formatter.localizedString(for: date, relativeTo: Date())) – klicka för att uppdatera"
     }
 
     // MARK: Sections
@@ -135,7 +135,7 @@ struct HubTab: View {
                                             removal: .move(edge: .trailing).combined(with: .opacity)))
             } else {
                 HubList(items: hub.visibleTasks,
-                        empty: ("checkmark.circle", hub.settings.showsTodayOnly ? "Nothing left for today" : "Nothing on your list")) { task in
+                        empty: ("checkmark.circle", hub.settings.showsTodayOnly ? "Inget kvar för idag" : "Inget på din lista")) { task in
                     HubTaskRow(task: task)
                 }
                 .transition(.opacity)
@@ -144,15 +144,15 @@ struct HubTab: View {
             CalendarGridView()
         case .approvals:
             HubList(items: hub.visibleApprovals,
-                    empty: ("checkmark.seal", hub.settings.pendingApprovalsOnly ? "No approvals waiting" : "No approvals")) { approval in
+                    empty: ("checkmark.seal", hub.settings.pendingApprovalsOnly ? "Inga godkännanden väntar" : "Inga godkännanden")) { approval in
                 HubApprovalRow(approval: approval)
             }
         case .content:
-            HubList(items: hub.visiblePosts, empty: ("square.and.pencil", "Nothing scheduled the next \(hub.settings.contentDays) days")) { post in
+            HubList(items: hub.visiblePosts, empty: ("square.and.pencil", "Inget schemalagt de kommande \(hub.settings.contentDays) dagarna")) { post in
                 HubPostRow(post: post)
             }
         case .notifications:
-            HubList(items: hub.notifications, empty: ("bell.slash", "No notifications")) { notification in
+            HubList(items: hub.notifications, empty: ("bell.slash", "Inga notiser")) { notification in
                 HubNotificationRow(notification: notification)
             }
         }
@@ -251,7 +251,7 @@ struct PriorityBadge: View {
                     .opacity(inProgress ? 0 : 1)
             }
         }
-        .help(priority == .none ? "No priority" : "\(priority.title) priority")
+        .help(priority == .none ? "Ingen prioritet" : "Prioritet: \(priority.swedishTitle)")
     }
 
     private var color: Color { priority.color }
@@ -281,7 +281,7 @@ private struct HubEventRow: View {
                subtitle: parts.compactMap { $0 }.joined(separator: " · "),
                action: { open() }) {
             VStack(spacing: 0) {
-                Text(event.isAllDay ? "All" : event.start.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
+                Text(event.isAllDay ? "Alla" : event.start.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
                     .foregroundStyle(isNow ? Color.green : Color.white)
                 Text(event.isAllDay ? "day" : event.start.formatted(.dateTime.weekday(.abbreviated)))
@@ -292,7 +292,7 @@ private struct HubEventRow: View {
         } trailing: {
             if let meet = event.meetLink, isNow || (event.start > now && event.start.timeIntervalSince(now) < 15 * 60) {
                 Button { NSWorkspace.shared.open(meet) } label: {
-                    Label("Join", systemImage: "video.fill")
+                    Label("Gå med", systemImage: "video.fill")
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 8)
@@ -301,21 +301,21 @@ private struct HubEventRow: View {
                 }
                 .buttonStyle(.plain)
             } else if isNow {
-                Text("Now")
+                Text("Nu")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(.green))
             } else if !event.isAllDay, event.start > now, event.start.timeIntervalSince(now) < 3 * 3600 {
-                Text("in " + shortDuration(event.start.timeIntervalSince(now)))
+                Text("om " + shortDuration(event.start.timeIntervalSince(now)))
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
                     .foregroundStyle(.white.opacity(0.55))
             }
         }
         .contextMenu {
-            Button("Open in Acord Hub") { model.hub.openWeb(.calendar) }
-            Button("Copy Title") { copyToPasteboard(event.title) }
+            Button("Öppna i Acord Hub") { model.hub.openWeb(.calendar) }
+            Button("Kopiera titel") { copyToPasteboard(event.title) }
         }
     }
 
@@ -333,11 +333,11 @@ private struct HubEventRow: View {
 
     private var dayText: String {
         let calendar = Calendar.current
-        let day = calendar.isDateInToday(event.start) ? "Today"
-            : calendar.isDateInTomorrow(event.start) ? "Tomorrow"
+        let day = calendar.isDateInToday(event.start) ? "Idag"
+            : calendar.isDateInTomorrow(event.start) ? "Imorgon"
             : event.start.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
         guard !event.isAllDay, let end = event.end else { return day }
-        return day + " – until " + end.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
+        return day + " – till " + end.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
     }
 }
 
@@ -360,7 +360,7 @@ private struct HubApprovalRow: View {
             }
         }
         .contextMenu {
-            Button("Open in Acord Hub") { model.hub.openWeb(.approvals) }
+            Button("Öppna i Acord Hub") { model.hub.openWeb(.approvals) }
         }
     }
 
@@ -387,11 +387,11 @@ private struct HubPostRow: View {
 
     var body: some View {
         let when = post.date.map { date in
-            Calendar.current.isDateInToday(date) ? "Today " + date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
+            Calendar.current.isDateInToday(date) ? "Idag " + date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
                 : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour(.twoDigits(amPM: .omitted)).minute())
         }
         HubRow(title: post.title.replacingOccurrences(of: "\n", with: " "),
-               subtitle: [when, post.platformTitle, post.status == "DRAFT" ? "Draft" : nil, post.clientName]
+               subtitle: [when, post.platformTitle, post.status == "DRAFT" ? "Utkast" : nil, post.clientName]
                 .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
                titleOpacity: post.status == "DRAFT" ? 0.6 : 1,
                action: { model.hub.openWeb(.content) }) {
@@ -404,8 +404,8 @@ private struct HubPostRow: View {
             EmptyView()
         }
         .contextMenu {
-            Button("Open in Acord Hub") { model.hub.openWeb(.content) }
-            Button("Copy Title") { copyToPasteboard(post.title) }
+            Button("Öppna i Acord Hub") { model.hub.openWeb(.content) }
+            Button("Kopiera titel") { copyToPasteboard(post.title) }
         }
     }
 }
@@ -441,10 +441,10 @@ private struct HubNotificationRow: View {
             }
         }
         .contextMenu {
-            Button("Mark as Read") { hub.markRead(notification) }
-            Button("Mark All as Read") { hub.markAllRead() }
+            Button("Markera som läst") { hub.markRead(notification) }
+            Button("Markera alla som lästa") { hub.markAllRead() }
             Divider()
-            Button("Clear All Notifications") { hub.clearNotifications() }
+            Button("Rensa alla notiser") { hub.clearNotifications() }
         }
     }
 }
@@ -551,16 +551,16 @@ private struct HubSetupState: View {
                 .frame(width: 58, height: 58)
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.1)))
             VStack(alignment: .leading, spacing: 3) {
-                Text("Connect Acord Hub")
+                Text("Koppla Acord Hub")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("Add the Hub’s MCP address and your token in settings to see tasks, meetings, approvals and posts here.")
+                Text("Lägg in Hubbens MCP-adress och din token i inställningarna för att se uppgifter, möten, godkännanden och inlägg här.")
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.55))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
-                    CapsuleButton(title: "Open Settings") { model.onOpenSettings?() }
-                    CapsuleButton(title: "Open Acord Hub") { model.hub.openWeb() }
+                    CapsuleButton(title: "Öppna inställningar") { model.onOpenSettings?() }
+                    CapsuleButton(title: "Öppna Acord Hub") { model.hub.openWeb() }
                 }
                 .padding(.top, 7)
             }
@@ -574,7 +574,7 @@ private struct HubLoadingState: View {
     var body: some View {
         VStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text("Loading Acord Hub…").font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
+            Text("Laddar Acord Hub…").font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -586,7 +586,7 @@ private struct HubErrorState: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Label("Couldn’t load Acord Hub", systemImage: "exclamationmark.triangle.fill")
+            Label("Kunde inte ladda Acord Hub", systemImage: "exclamationmark.triangle.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.orange)
             Text(message)
@@ -595,8 +595,8 @@ private struct HubErrorState: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
             HStack(spacing: 8) {
-                CapsuleButton(title: "Try Again") { model.hub.refresh(force: true) }
-                CapsuleButton(title: "Settings") { model.onOpenSettings?() }
+                CapsuleButton(title: "Försök igen") { model.hub.refresh(force: true) }
+                CapsuleButton(title: "Inställningar") { model.onOpenSettings?() }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -628,7 +628,7 @@ private struct TodayToggle: View {
 
     var body: some View {
         Button(action: action) {
-            Text(isOn ? "Today" : "All")
+            Text(isOn ? "Idag" : "Alla")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(isOn ? Color.black : Color.white.opacity(0.8))
                 .padding(.horizontal, 9)
@@ -638,7 +638,7 @@ private struct TodayToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .help(isOn ? "Showing today’s and overdue tasks – click to show all" : "Showing all tasks – click to show today’s")
+        .help(isOn ? "Visar dagens och försenade uppgifter – klicka för att visa alla" : "Visar alla uppgifter – klicka för att visa dagens")
     }
 }
 
@@ -653,7 +653,7 @@ private struct HubToastView: View {
                 .foregroundStyle(.white)
                 .lineLimit(1)
             if toast.undo != nil {
-                Button("Undo") { model.hub.performUndo() }
+                Button("Ångra") { model.hub.performUndo() }
                     .buttonStyle(.plain)
                     .font(.system(size: 11.5, weight: .bold))
                     .foregroundStyle(Color.accentColor)
@@ -678,7 +678,7 @@ private struct CalendarConnectBanner: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Connect your Google Calendar")
+                Text("Koppla din Google Kalender")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                 Text(message)
@@ -687,7 +687,7 @@ private struct CalendarConnectBanner: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 6)
-            CapsuleButton(title: "Connect") { model.hub.connectCalendar() }
+            CapsuleButton(title: "Koppla") { model.hub.connectCalendar() }
         }
         .padding(.horizontal, 10)
         .frame(height: 44)

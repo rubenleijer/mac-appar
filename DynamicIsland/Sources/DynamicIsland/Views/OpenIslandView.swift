@@ -58,7 +58,7 @@ struct OpenIslandView: View {
                     Image(systemName: "gearshape.fill").font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 26))
-                .help("Settings")
+                .help("Inställningar")
             }
         }
         .padding(.horizontal, IslandLayout.contentPadding - 6)
@@ -73,19 +73,19 @@ struct OpenIslandView: View {
     }
 
     private var visibleTabs: [TabItem] {
-        var tabs = [TabItem(tab: .media, symbol: "music.note", help: "Now Playing")]
+        var tabs = [TabItem(tab: .media, symbol: "music.note", help: "Spelas nu")]
         if model.showsHubTab {
             tabs.append(TabItem(tab: .hub, symbol: "checklist", help: "Acord Hub", badge: model.hub.unreadCount))
         }
         if model.settings.showClipboardTab {
-            tabs.append(TabItem(tab: .clipboard, symbol: "doc.on.clipboard.fill", help: "Clipboard queue"))
+            tabs.append(TabItem(tab: .clipboard, symbol: "doc.on.clipboard.fill", help: "Urklippskö"))
         }
         if model.settings.showTrayTab {
             tabs.append(TabItem(tab: .tray, symbol: model.tray.items.isEmpty ? "tray.fill" : "tray.full.fill", help: "Tray"))
         }
-        if model.settings.showHomeTab { tabs.append(TabItem(tab: .home, symbol: "house.fill", help: "Home")) }
-        tabs.append(TabItem(tab: .controls, symbol: "switch.2", help: "Sound and display"))
-        if model.showsPostureTab { tabs.append(TabItem(tab: .posture, symbol: "figure.stand", help: "Posture")) }
+        if model.settings.showHomeTab { tabs.append(TabItem(tab: .home, symbol: "house.fill", help: "Hem")) }
+        tabs.append(TabItem(tab: .controls, symbol: "switch.2", help: "Ljud och skärm"))
+        if model.showsPostureTab { tabs.append(TabItem(tab: .posture, symbol: "figure.stand", help: "Hållning")) }
         return tabs
     }
 
@@ -121,7 +121,7 @@ struct OpenIslandView: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(badge > 0 ? "\(help) – \(badge) unread" : help)
+        .help(badge > 0 ? "\(help) – \(badge) olästa" : help)
     }
 }
 
@@ -141,9 +141,9 @@ private struct MediaTab: View {
             HStack(spacing: 14) {
                 artwork
                 VStack(alignment: .leading, spacing: 2) {
-                    MarqueeText(text: media.hasMedia ? media.title : "Not Playing",
+                    MarqueeText(text: media.hasMedia ? media.title : "Inget spelas",
                                 font: .system(size: 15, weight: .semibold))
-                    MarqueeText(text: media.hasMedia ? media.subtitle : "Play something in any app",
+                    MarqueeText(text: media.hasMedia ? media.subtitle : "Spela något i valfri app",
                                 font: .system(size: 13), color: .white.opacity(0.55))
                     Spacer(minLength: 0)
                     transportControls
@@ -186,7 +186,7 @@ private struct MediaTab: View {
                 }
             }
             .onTapGesture { media.openPlayer() }
-            .help(media.bundleIdentifier == nil ? "" : "Open the player")
+            .help(media.bundleIdentifier == nil ? "" : "Öppna spelaren")
     }
 
     private var transportControls: some View {
@@ -220,7 +220,7 @@ private struct MediaTab: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(IslandButtonStyle(diameter: 30))
-        .help(model.audio.currentDevice?.name ?? "Audio output")
+        .help(model.audio.currentDevice?.name ?? "Ljudutgång")
     }
 
     private var progressRow: some View {
@@ -303,7 +303,7 @@ private struct ControlsTab: View {
                 .frame(height: IslandLayout.sliderRowHeight)
             }
 
-            Text("Audio output")
+            Text("Ljudutgång")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.45))
                 .frame(height: IslandLayout.sectionHeaderHeight, alignment: .bottomLeading)

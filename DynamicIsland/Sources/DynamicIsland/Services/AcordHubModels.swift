@@ -79,7 +79,7 @@ extension HubTimer {
         let elapsedMs = (json["elapsedMs"] as? NSNumber)?.doubleValue ?? 0
         let paused = json["isPaused"] as? Bool ?? false
         self.init(taskID: taskID,
-                  title: json["taskTitle"] as? String ?? "Task",
+                  title: json["taskTitle"] as? String ?? "Uppgift",
                   start: now.addingTimeInterval(-elapsedMs / 1000),
                   pausedElapsed: paused ? elapsedMs / 1000 : nil,
                   isHub: true)
@@ -127,10 +127,10 @@ struct HubApproval: Identifiable, Equatable {
 
     var statusTitle: String {
         switch status {
-        case "APPROVED": "Approved"
-        case "PENDING", "SENT", "WAITING": "Waiting for client"
-        case "CHANGES_REQUESTED", "REJECTED", "REVISION": "Changes requested"
-        case "DRAFT": "Draft"
+        case "APPROVED": "Godkänd"
+        case "PENDING", "SENT", "WAITING": "Väntar på kund"
+        case "CHANGES_REQUESTED", "REJECTED", "REVISION": "Ändringar önskas"
+        case "DRAFT": "Utkast"
         default: status.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
@@ -378,7 +378,7 @@ extension HubEvent {
     init?(_ json: HubJSON) {
         guard let start = json.date("start", "start_at", "starts_at", "start_time", "startTime", "date") else { return nil }
         let end = json.date("end", "end_at", "ends_at", "end_time", "endTime")
-        let title = json.string("title", "summary", "name") ?? "Event"
+        let title = json.string("title", "summary", "name") ?? "Händelse"
         self.init(id: json.string("id") ?? "\(title)-\(start.date.timeIntervalSince1970)",
                   title: title,
                   start: start.date,
@@ -400,7 +400,7 @@ extension HubApproval {
     init?(_ json: HubJSON) {
         guard let id = json.string("id") else { return nil }
         self.init(id: id,
-                  title: json.string("title", "name") ?? "Approval",
+                  title: json.string("title", "name") ?? "Godkännande",
                   status: (json.string("status") ?? "PENDING").uppercased(),
                   clientName: json.string("client_name", "clientName"),
                   updated: json.date("updated_at", "created_at")?.date)
@@ -411,7 +411,7 @@ extension HubPost {
     init?(_ json: HubJSON) {
         guard let id = json.string("id") else { return nil }
         self.init(id: id,
-                  title: json.string("title") ?? json.string("caption_preview") ?? "Post",
+                  title: json.string("title") ?? json.string("caption_preview") ?? "Inlägg",
                   date: json.date("scheduled_at", "date")?.date,
                   status: (json.string("status") ?? "DRAFT").uppercased(),
                   platforms: json.strings("platforms"),

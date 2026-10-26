@@ -16,7 +16,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $page) {
-                Text("General").tag(Page.general)
+                Text("Allmänt").tag(Page.general)
                 Text("Acord Hub").tag(Page.hub)
             }
             .pickerStyle(.segmented)
@@ -39,137 +39,137 @@ struct SettingsView: View {
         @Bindable var settings = model.settings
         return Form {
             Section {
-                Toggle("Launch at login", isOn: $launchAtLogin)
+                Toggle("Öppna vid inloggning", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
-                Toggle("Open when the pointer rests on the notch", isOn: $settings.hoverToOpen)
-                Toggle("Haptic feedback", isOn: $settings.hapticFeedback)
+                Toggle("Öppna när pekaren vilar på notchen", isOn: $settings.hoverToOpen)
+                Toggle("Haptisk feedback", isOn: $settings.hapticFeedback)
             } header: {
-                Text("General")
+                Text("Allmänt")
             } footer: {
                 Text(settings.hoverToOpen
-                     ? "You feel a tap when the pointer reaches the notch and when a slider hits its end – only with a finger on the trackpad."
-                     : "Click the notch to open the island. You feel a tap when a slider hits its end.")
+                     ? "Du känner ett tryck när pekaren når notchen och när ett reglage når sitt slut – bara med ett finger på styrplattan."
+                     : "Klicka på notchen för att öppna ön. Du känner ett tryck när ett reglage når sitt slut.")
                     .foregroundStyle(.secondary)
             }
 
-            Section("Live activities") {
-                Toggle("Show what’s playing", isOn: $settings.showLiveActivity)
-                Toggle("Show track changes", isOn: $settings.showTrackChanges)
-                Toggle("Show audio output changes", isOn: $settings.showDeviceChanges)
+            Section("Live-aktiviteter") {
+                Toggle("Visa vad som spelas", isOn: $settings.showLiveActivity)
+                Toggle("Visa låtbyten", isOn: $settings.showTrackChanges)
+                Toggle("Visa byte av ljudutgång", isOn: $settings.showDeviceChanges)
             }
 
             Section {
-                Toggle("Show temperature and battery in Sound and display", isOn: $settings.showTemperature)
-                Toggle("Show temperature and battery beside the notch", isOn: $settings.showTemperatureLiveActivity)
+                Toggle("Visa temperatur och batteri under Ljud och skärm", isOn: $settings.showTemperature)
+                Toggle("Visa temperatur och batteri bredvid notchen", isOn: $settings.showTemperatureLiveActivity)
                 HStack {
-                    Toggle("Warn when the Mac runs hot", isOn: $settings.warnWhenHot)
+                    Toggle("Varna när Macen går varm", isOn: $settings.warnWhenHot)
                     Spacer()
                     Picker("", selection: $settings.hotThreshold) {
-                        ForEach([75, 80, 85, 90, 95, 100], id: \.self) { Text("at \($0)°C").tag($0) }
+                        ForEach([75, 80, 85, 90, 95, 100], id: \.self) { Text("vid \($0)°C").tag($0) }
                     }
                     .labelsHidden()
                     .fixedSize()
                     .disabled(!settings.warnWhenHot)
                 }
                 HStack {
-                    Text(model.thermal.isAvailable ? "CPU now: \(model.thermal.cpuText) · \(model.thermal.thermalTitle)" : "No temperature sensors found")
+                    Text(model.thermal.isAvailable ? "CPU nu: \(model.thermal.cpuText) · \(model.thermal.thermalTitle)" : "Inga temperatursensorer hittades")
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
             } header: {
-                Text("Temperature and battery")
+                Text("Temperatur och batteri")
             } footer: {
-                Text("Read from the chip’s own sensors every few seconds. The notch shows it only when nothing else is there.")
+                Text("Läses från chipets egna sensorer med några sekunders mellanrum. Notchen visar det bara när inget annat visas där.")
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Show Clipboard queue tab", isOn: $settings.showClipboardTab)
-                Picker("Keep", selection: $settings.clipboardLimit) {
-                    ForEach([10, 20, 30, 50, 100], id: \.self) { Text("\($0) items").tag($0) }
+                Toggle("Visa fliken Urklippskö", isOn: $settings.showClipboardTab)
+                Picker("Behåll", selection: $settings.clipboardLimit) {
+                    ForEach([10, 20, 30, 50, 100], id: \.self) { Text("\($0) objekt").tag($0) }
                 }
                 .disabled(!settings.showClipboardTab)
             } header: {
-                Text("Clipboard queue")
+                Text("Urklippskö")
             } footer: {
-                Text("Everything you copy lines up in the island. Click an item to put it on the clipboard; with Queue on, each ⌘V moves on to the next one (needs Accessibility). Passwords from password managers are never kept, and only text is saved between launches.")
+                Text("Allt du kopierar hamnar i kö i ön. Klicka på en rad för att lägga den i urklippet; med Kö på går varje ⌘V vidare till nästa (kräver Hjälpmedel). Lösenord från lösenordshanterare sparas aldrig, och bara text sparas mellan omstarter.")
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Show Tray tab", isOn: $settings.showTrayTab)
-                Toggle("Open the tray when dragging files to the notch", isOn: $settings.openTrayOnDrag)
+                Toggle("Visa fliken Tray", isOn: $settings.showTrayTab)
+                Toggle("Öppna trayen när filer dras till notchen", isOn: $settings.openTrayOnDrag)
                     .disabled(!settings.showTrayTab)
-                Picker("Remove items after", selection: $settings.trayRetentionDays) {
-                    Text("Never").tag(0)
-                    Text("1 day").tag(1)
-                    Text("1 week").tag(7)
-                    Text("30 days").tag(30)
+                Picker("Ta bort objekt efter", selection: $settings.trayRetentionDays) {
+                    Text("Aldrig").tag(0)
+                    Text("1 dag").tag(1)
+                    Text("1 vecka").tag(7)
+                    Text("30 dagar").tag(30)
                 }
                 .disabled(!settings.showTrayTab)
                 HStack {
-                    Text(model.tray.items.count == 1 ? "1 item" : "\(model.tray.items.count) items").foregroundStyle(.secondary)
+                    Text(model.tray.items.count == 1 ? "1 objekt" : "\(model.tray.items.count) objekt").foregroundStyle(.secondary)
                     Spacer()
-                    Button("Show Folder") { model.tray.openFolder() }
-                    Button("Empty Tray") { model.tray.clear() }.disabled(model.tray.items.isEmpty)
+                    Button("Visa mapp") { model.tray.openFolder() }
+                    Button("Töm trayen") { model.tray.clear() }.disabled(model.tray.items.isEmpty)
                 }
             } header: {
                 Text("Tray")
             } footer: {
-                Text("Drag files, images or links onto the notch to keep them in the tray, then drag them out into any app. Items are copied, so the originals can move. Removed items go to the Trash.")
+                Text("Dra filer, bilder eller länkar till notchen för att spara dem i trayen och dra sedan ut dem i valfri app. De kopieras, så originalen kan flyttas. Borttagna objekt hamnar i papperskorgen.")
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Show Home tab", isOn: $settings.showHomeTab)
-                TextField("Shortcuts folder", text: $settings.homeFolderName)
+                Toggle("Visa fliken Hem", isOn: $settings.showHomeTab)
+                TextField("Mapp i Genvägar", text: $settings.homeFolderName)
                     .onSubmit { model.home.refresh() }
                     .disabled(!settings.showHomeTab)
                 HStack {
                     Text(homeStatus).foregroundStyle(.secondary)
                     Spacer()
-                    Button("Open Shortcuts") { HomeService.openShortcutsApp() }
+                    Button("Öppna Genvägar") { HomeService.openShortcutsApp() }
                 }
             } header: {
-                Text("Home")
+                Text("Hem")
             } footer: {
-                Text("Create shortcuts with the Control Home action (for example, turn on lights or set a scene) and put them in this folder. A leading emoji becomes the tile’s icon. If a shortcut outputs “on” or “off”, its tile shows that state.")
+                Text("Skapa genvägar med åtgärden Styr hem (t.ex. tänd lampor eller välj en scen) och lägg dem i den här mappen. En emoji först blir ikonen. Om genvägen ger ”på” eller ”av” visar rutan det.")
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Show Posture tab", isOn: $settings.showPostureTab)
-                Toggle("Show posture reminders", isOn: $settings.showPostureAlerts)
-                Toggle("Show a live activity for poor posture", isOn: $settings.showPostureLiveActivity)
+                Toggle("Visa fliken Hållning", isOn: $settings.showPostureTab)
+                Toggle("Visa hållningspåminnelser", isOn: $settings.showPostureAlerts)
+                Toggle("Visa live-aktivitet vid dålig hållning", isOn: $settings.showPostureLiveActivity)
                 HStack {
-                    Label(model.posture.isConnected ? "Posture is running" : "Posture is not running",
+                    Label(model.posture.isConnected ? "Hållning körs" : "Hållning körs inte",
                           systemImage: model.posture.isConnected ? "checkmark.circle.fill" : "circle.dashed")
                         .foregroundStyle(model.posture.isConnected ? Color.green : Color.secondary)
                     Spacer()
-                    Button("Open Posture") { model.posture.openApp() }
+                    Button("Öppna Hållning") { model.posture.openApp() }
                 }
             } header: {
-                Text("Posture")
+                Text("Hållning")
             } footer: {
-                Text("Posture is a companion app that watches how you sit. While it runs, its reminders and status appear in the island.")
+                Text("Hållning är en följeslagarapp som håller koll på hur du sitter. När den körs syns dess påminnelser och status i ön.")
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Show volume changes in the island", isOn: $settings.showVolumeHUD)
-                Toggle("Replace the system volume and brightness HUD", isOn: $settings.replaceSystemHUD)
+                Toggle("Visa volymändringar i ön", isOn: $settings.showVolumeHUD)
+                Toggle("Ersätt systemets volym- och ljusstyrkeruta", isOn: $settings.replaceSystemHUD)
                 if settings.replaceSystemHUD && !hasAccessibility {
                     HStack {
-                        Label("Requires Accessibility permission", systemImage: "exclamationmark.triangle.fill")
+                        Label("Kräver behörighet för Hjälpmedel", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                         Spacer()
-                        Button("Open Settings…") { openAccessibilitySettings() }
+                        Button("Öppna Inställningar…") { openAccessibilitySettings() }
                     }
                 }
             } header: {
-                Text("Volume and brightness")
+                Text("Volym och ljusstyrka")
             } footer: {
-                Text("The volume and brightness keys then show only in the island. Hold ⌥⇧ for finer steps.")
+                Text("Volym- och ljusstyrketangenterna visas då bara i ön. Håll ⌥⇧ för finare steg.")
                     .foregroundStyle(.secondary)
             }
 
@@ -186,7 +186,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Quit") { NSApp.terminate(nil) }
+                    Button("Avsluta") { NSApp.terminate(nil) }
                 }
             }
         }
@@ -200,8 +200,8 @@ struct SettingsView: View {
 
     private var homeStatus: String {
         let home = model.home
-        if !home.folderExists { return "Folder not found" }
-        return home.shortcuts.count == 1 ? "1 shortcut" : "\(home.shortcuts.count) shortcuts"
+        if !home.folderExists { return "Mappen hittades inte" }
+        return home.shortcuts.count == 1 ? "1 genväg" : "\(home.shortcuts.count) genvägar"
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
@@ -257,29 +257,29 @@ private struct UpdatesSection: View {
     var body: some View {
         @Bindable var settings = model.settings
         Section {
-            Toggle("Check for updates automatically", isOn: $settings.autoUpdate)
-            Toggle("Install updates automatically", isOn: $settings.autoInstallUpdates)
+            Toggle("Sök efter uppdateringar automatiskt", isOn: $settings.autoUpdate)
+            Toggle("Installera uppdateringar automatiskt", isOn: $settings.autoInstallUpdates)
                 .disabled(!settings.autoUpdate)
             HStack {
                 status
                 Spacer()
                 switch updates.state {
                 case .available:
-                    Button("Install Now") { updates.install() }
+                    Button("Installera nu") { updates.install() }
                 case .installing, .checking:
                     ProgressView().controlSize(.small)
                 default:
-                    Button("Check Now") { Task { await updates.check() } }
+                    Button("Sök nu") { Task { await updates.check() } }
                 }
             }
             HStack {
-                TextField("Repository", text: $settings.updateRepository)
-                TextField("Branch", text: $settings.updateBranch).frame(width: 110)
+                TextField("Repo", text: $settings.updateRepository)
+                TextField("Gren", text: $settings.updateBranch).frame(width: 110)
             }
         } header: {
-            Text("Updates")
+            Text("Uppdateringar")
         } footer: {
-            Text("Updates are built on this Mac from GitHub and installed in Applications – the island relaunches by itself. Build \(updates.shortCommit).")
+            Text("Uppdateringar byggs på den här Macen från GitHub och installeras i Program – ön startar om av sig själv. Bygge \(updates.shortCommit).")
                 .foregroundStyle(.secondary)
         }
     }
@@ -287,15 +287,15 @@ private struct UpdatesSection: View {
     @ViewBuilder
     private var status: some View {
         switch updates.state {
-        case .idle: Text("Not checked yet").foregroundStyle(.secondary)
-        case .checking: Text("Checking…").foregroundStyle(.secondary)
-        case .upToDate: Label("Up to date", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-        case .available(let message): Label("Update: \(message)", systemImage: "arrow.down.circle.fill").foregroundStyle(.blue).lineLimit(1)
-        case .installing: Text("Building the update – the island restarts when it’s done").foregroundStyle(.secondary)
+        case .idle: Text("Inte sökt än").foregroundStyle(.secondary)
+        case .checking: Text("Söker…").foregroundStyle(.secondary)
+        case .upToDate: Label("Senaste versionen", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case .available(let message): Label("Uppdatering: \(message)", systemImage: "arrow.down.circle.fill").foregroundStyle(.blue).lineLimit(1)
+        case .installing: Text("Bygger uppdateringen – ön startar om när den är klar").foregroundStyle(.secondary)
         case .failed(let message):
             HStack {
                 Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).lineLimit(2)
-                Button("Log") { updates.openLog() }
+                Button("Logg") { updates.openLog() }
             }
         }
     }

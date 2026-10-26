@@ -17,9 +17,9 @@ struct ClipItem: Identifiable, Equatable {
             return (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: "\n", with: " ⏎ ")
         case .image:
-            return image.map { "Image · \(Int($0.size.width))×\(Int($0.size.height))" } ?? "Image"
+            return image.map { "Bild · \(Int($0.size.width))×\(Int($0.size.height))" } ?? "Bild"
         case .files:
-            return files.count == 1 ? files[0].lastPathComponent : "\(files.count) files"
+            return files.count == 1 ? files[0].lastPathComponent : "\(files.count) filer"
         }
     }
 

@@ -60,13 +60,13 @@ actor AcordHubClient {
 
     /// Runs the MCP handshake if it hasn't happened yet. Call before firing requests in parallel.
     func connect() async throws {
-        guard let configuration else { throw HubError("Acord Hub is not set up") }
+        guard let configuration else { throw HubError("Acord Hub är inte inställd") }
         if !isInitialized { try await initialize(configuration) }
     }
 
     /// The names of the tools the server offers.
     func listTools() async throws -> [String] {
-        guard let configuration else { throw HubError("Acord Hub is not set up") }
+        guard let configuration else { throw HubError("Acord Hub är inte inställd") }
         if !isInitialized { try await initialize(configuration) }
         let result: [String: Any]
         do {
@@ -81,7 +81,7 @@ actor AcordHubClient {
 
     /// Calls a tool and returns its JSON payload (the structured content, or the text content).
     func call(_ tool: String, _ arguments: [String: HubArgument] = [:]) async throws -> Data {
-        guard let configuration else { throw HubError("Acord Hub is not set up") }
+        guard let configuration else { throw HubError("Acord Hub är inte inställd") }
         if !isInitialized { try await initialize(configuration) }
         do {
             return try await callTool(tool, arguments, configuration)
@@ -138,9 +138,9 @@ actor AcordHubClient {
         let (data, response) = try await send(body, configuration)
 
         let message = Self.message(in: data, contentType: response.value(forHTTPHeaderField: "Content-Type"), id: id)
-        guard let message else { throw HubError("The Hub sent an unreadable response to \(method)") }
+        guard let message else { throw HubError("Hubben skickade ett oläsbart svar på \(method)") }
         if let error = message["error"] as? [String: Any] {
-            throw HubError(error["message"] as? String ?? "The Hub returned an error")
+            throw HubError(error["message"] as? String ?? "Hubben svarade med ett fel")
         }
         return message["result"] as? [String: Any] ?? [:]
     }
@@ -165,22 +165,22 @@ actor AcordHubClient {
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
-            throw HubError(error.code == .notConnectedToInternet ? "You’re offline" : "Can’t reach the Hub (\(error.localizedDescription))")
+            throw HubError(error.code == .notConnectedToInternet ? "Du är offline" : "Når inte Hubben (\(error.localizedDescription))")
         }
-        guard let http = response as? HTTPURLResponse else { throw HubError("The Hub sent no HTTP response") }
+        guard let http = response as? HTTPURLResponse else { throw HubError("Hubben skickade inget HTTP-svar") }
         if let newSession = http.value(forHTTPHeaderField: "Mcp-Session-Id") { sessionID = newSession }
 
         switch http.statusCode {
         case 200..<300:
             return (data, http)
         case 401, 403:
-            throw HubError("The Hub rejected the token (HTTP \(http.statusCode))")
+            throw HubError("Hubben godtog inte token (HTTP \(http.statusCode))")
         case 404 where sessionID != nil && isInitialized:
             throw SessionExpired()
         case 404:
-            throw HubError("No MCP server at this address (HTTP 404)")
+            throw HubError("Ingen MCP-server på den adressen (HTTP 404)")
         default:
-            throw HubError("The Hub answered HTTP \(http.statusCode)")
+            throw HubError("Hubben svarade HTTP \(http.statusCode)")
         }
     }
 

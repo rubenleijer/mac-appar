@@ -14,9 +14,9 @@ struct ClipboardTab: View {
                 VStack(spacing: 6) {
                     Image(systemName: "doc.on.clipboard")
                         .font(.system(size: 22, weight: .medium))
-                    Text("Copy something – it lines up here")
+                    Text("Kopiera något – det hamnar i kön här")
                         .font(.system(size: 12, weight: .semibold))
-                    Text("Click an item to put it back on the clipboard.")
+                    Text("Klicka på en rad för att lägga den i urklippet igen.")
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.45))
                 }
@@ -47,7 +47,7 @@ struct ClipboardTab: View {
     private var toolbar: some View {
         @Bindable var clipboard = model.clipboard
         return HStack(spacing: 8) {
-            Text(clipboard.items.count == 1 ? "1 item" : "\(clipboard.items.count) items")
+            Text(clipboard.items.count == 1 ? "1 objekt" : "\(clipboard.items.count) objekt")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.5))
             Spacer(minLength: 4)
@@ -55,20 +55,20 @@ struct ClipboardTab: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 11))
                     .foregroundStyle(.orange)
-                    .help("⌘V can only move the queue on with Accessibility access – turn it on in System Settings → Privacy & Security → Accessibility. Clicking items still works.")
+                    .help("⌘V kan bara stega i kön med behörighet för Hjälpmedel – slå på det i Systeminställningar → Integritet och säkerhet → Hjälpmedel. Att klicka på rader fungerar ändå.")
             }
             QueueToggle(isOn: $clipboard.queueMode)
             Button { clipboard.advance() } label: {
                 Image(systemName: "arrow.down").font(.system(size: 11, weight: .bold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
-            .help("Put the next item on the clipboard")
+            .help("Lägg nästa rad i urklippet")
             .disabled(clipboard.nextItem == nil)
             Button { clipboard.clear() } label: {
                 Image(systemName: "trash").font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(IslandButtonStyle(diameter: 24))
-            .help("Clear the queue")
+            .help("Töm kön")
             .disabled(clipboard.items.isEmpty)
         }
         .frame(height: 26)
@@ -83,7 +83,7 @@ private struct QueueToggle: View {
         Button { isOn.toggle() } label: {
             HStack(spacing: 4) {
                 Image(systemName: isOn ? "list.number" : "list.bullet").font(.system(size: 10, weight: .bold))
-                Text(isOn ? "Queue on" : "Queue").font(.system(size: 11, weight: .semibold))
+                Text(isOn ? "Kö på" : "Kö").font(.system(size: 11, weight: .semibold))
             }
             .foregroundStyle(isOn ? Color.black : Color.white.opacity(0.85))
             .padding(.horizontal, 9)
@@ -93,7 +93,7 @@ private struct QueueToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .help(isOn ? "Each ⌘V moves the clipboard on to the next item" : "Paste the queue in order: each ⌘V moves on to the next item")
+        .help(isOn ? "Varje ⌘V flyttar urklippet till nästa rad" : "Klistra in kön i ordning: varje ⌘V går vidare till nästa rad")
     }
 }
 
@@ -142,7 +142,7 @@ private struct ClipRow: View {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                 }
                 .buttonStyle(IslandButtonStyle(diameter: 20))
-                .help("Remove from the queue")
+                .help("Ta bort ur kön")
                 .transition(.opacity)
             }
         }
@@ -161,17 +161,17 @@ private struct ClipRow: View {
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovering)
         .contextMenu {
-            Button("Copy") { model.clipboard.use(item) }
-            Button("Remove") { model.clipboard.remove(item) }
+            Button("Kopiera") { model.clipboard.use(item) }
+            Button("Ta bort") { model.clipboard.remove(item) }
             Divider()
-            Button("Clear Queue") { model.clipboard.clear() }
+            Button("Töm kön") { model.clipboard.clear() }
         }
         .help(item.text ?? item.preview)
     }
 
     private var subtitle: String {
         var parts: [String] = []
-        if isCurrent { parts.append("On the clipboard") } else if isNext { parts.append("Next") }
+        if isCurrent { parts.append("I urklippet") } else if isNext { parts.append("Nästa") }
         if let source = item.sourceApp { parts.append(source) }
         parts.append(item.date.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))
         return parts.joined(separator: " · ")
