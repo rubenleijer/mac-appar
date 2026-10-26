@@ -1,4 +1,4 @@
-<h1 align="center">mac-appar</h1>
+<h1 align="center">mac-appar · Acord edition</h1>
 
 <p align="center">
   Two native macOS apps written in Swift and SwiftUI.<br>
@@ -15,6 +15,24 @@
 <p align="center">
   <img src="DynamicIsland/Screenshots/hero.png" alt="Dynamic Island open under the menu bar">
 </p>
+
+## Acord edition – install
+
+This fork is the **Acord Media** version of Dynamic Island: everything in the original plus Acord Hub (tasks, timer and time logging, calendar and Google meetings, approvals, posts), a file tray, temperature and battery, and automatic updates.
+
+**Install on a new Mac** (Apple silicon, macOS 14+):
+
+1. Download [`Install Dynamic Island.command`](https://raw.githubusercontent.com/rubenleijer/mac-appar/main/DynamicIsland/Install%20Dynamic%20Island.command) (right-click → Save Link As…), or run this in Terminal:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/rubenleijer/mac-appar/main/DynamicIsland/Scripts/update.sh | bash
+   ```
+2. If you downloaded the file: right-click it → **Open** (the first time macOS asks because it's from the internet). It builds the app, installs it in Applications and starts it – a couple of minutes.
+3. Open the island's **Settings** (right-click the notch) → **Acord Hub**: the MCP server is `https://hub.acordmedia.com/api/mcp`. Ask Ruben for the MCP token, then **Test Connection** and pick yourself under **You are**.
+4. Optional: **General** → turn on **Replace the system volume and brightness HUD** and allow Accessibility when asked.
+
+From then on the app checks this repository every couple of minutes and updates itself – everyone stays on the same version.
+
+→ [Everything the Acord edition does](DynamicIsland/README.md#acord-hub)
 
 ## The apps
 

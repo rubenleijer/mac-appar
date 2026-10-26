@@ -5,7 +5,7 @@
 set -euo pipefail
 
 REPO="${1:-rubenleijer/mac-appar}"
-BRANCH="${2:-acord-hub}"
+BRANCH="${2:-main}"
 SUPPORT="$HOME/Library/Application Support/Dynamic Island"
 SRC="$SUPPORT/Source"
 IDENTITY="Dynamic Island Local Signing"

@@ -28,6 +28,9 @@
 - **HUDs in the notch.** Volume, brightness and output changes appear in the island. It can also replace the system's volume and brightness overlay.
 - **Apple Home.** Tap tiles to run your Home scenes and accessories through Shortcuts.
 - **Acord Hub.** Tasks, meetings, approvals and scheduled posts from Acord Hub in their own tab, alerts in the notch when something needs you, a countdown to your next meeting, and a quick way to add tasks.
+- **Tray.** Drop files, images, links or text on the notch; drag them out again into any app.
+- **Temperature and battery.** CPU, GPU, battery and SSD temperatures with a short history, battery level and time left, a warning when the Mac runs hot, and an optional live activity beside the notch.
+- **Updates itself.** Checks GitHub every couple of minutes, builds the new version on the Mac and relaunches.
 - **Posture companion.** With the [Posture](../Hallning) app running, the island shows your posture and nudges you when you slouch.
 - **Feels like a Mac.** Spring animations, blur-and-scale transitions, rubber-band sliders, SF Symbols and trackpad haptics. It never steals focus from the app you're using.
 
@@ -91,6 +94,26 @@ The Hub tab reads Acord Hub through its MCP server, the same tools Claude uses, 
 
 **Live activity.** While the island is closed it can show the next meeting or post with a countdown, the time left of a meeting in progress, or the number of overdue tasks. Meetings can take priority over music.
 
+**Working on tasks.** Today's (and overdue) tasks show as cards styled like the Hub, coloured by priority. Tick the circle to finish one (with undo), click it to open its description and checklist, change status, due date and priority, edit it or delete it. Right-click for everything.
+
+**Time.** ▶ on a card starts the Hub's own timer – the same one as in Att göra – and the notch shows it while it runs; pause, resume, stop and log, or stop and mark done. The clock icon logs time without a timer (15 min to 2 h, or any amount like `1:30` with a note). Today's logged total sits in the toolbar.
+
+**Google Calendar.** Meetings come through the Hub: connect Google there once (the Calendar section has a **Connect** button) and they show in the calendar, the countdown and reminders; **Join** opens the Meet link near the start.
+
+The Hub side of this lives in `acord-hub` (`lib/mcp/`): the timer, time, meetings and `dashboard_snapshot` tools.
+
+### Tray
+
+Drag files, images, links or text onto the notch – the island opens on the tray and keeps a copy. Drag them out into any app; double-click opens, right-click shows them in Finder. Settings can empty the tray automatically after a day, a week or a month.
+
+### Temperature and battery
+
+Sound and display shows the CPU temperature with a short graph, GPU, battery and SSD temperatures, and the battery level. Turn on **Show temperature and battery beside the notch** to see them on either side of the camera when nothing else is there, and pick when the island should warn that the Mac runs hot.
+
+### Updates
+
+The app compares the commit it was built from with this repository's `main` branch every couple of minutes and after waking, and updates itself while the island is closed. **Settings → General → Updates** has Check Now and the log. Builds are signed with a local certificate created once, so the Accessibility permission survives updates.
+
 ### Replacing the system volume HUD
 
 Turn on **Replace the system volume and brightness HUD** in settings and grant **Accessibility** access when asked. The volume and brightness keys then show only in the island. Hold <kbd>⌥</kbd><kbd>⇧</kbd> for quarter steps, like on macOS.
@@ -108,7 +131,7 @@ Turn on **Replace the system volume and brightness HUD** in settings and grant *
 
 Everything else, like Now Playing, volume, outputs and brightness, works without any prompts. Shortcuts may ask for access to Home the first time a Home shortcut runs.
 
-The only network traffic is to the Acord Hub server you configure, and only once you've added a token. There are no analytics. Everything else stays on your Mac.
+Network traffic goes to the Acord Hub server you configure (once you've added a token) and to GitHub to check for updates. There are no analytics. Everything else stays on your Mac.
 
 ## How it works
 

@@ -83,7 +83,7 @@ final class AppSettings {
             Key.autoUpdate: true,
             Key.autoInstallUpdates: true,
             Key.updateRepository: "rubenleijer/mac-appar",
-            Key.updateBranch: "acord-hub",
+            Key.updateBranch: "main",
             Key.openTrayOnDrag: true,
             Key.trayRetentionDays: 0,
             Key.homeFolderName: "Home",
@@ -112,7 +112,7 @@ final class AppSettings {
         autoUpdate = defaults.bool(forKey: Key.autoUpdate)
         autoInstallUpdates = defaults.bool(forKey: Key.autoInstallUpdates)
         updateRepository = defaults.string(forKey: Key.updateRepository) ?? "rubenleijer/mac-appar"
-        updateBranch = defaults.string(forKey: Key.updateBranch) ?? "acord-hub"
+        updateBranch = defaults.string(forKey: Key.updateBranch) ?? "main"
         openTrayOnDrag = defaults.bool(forKey: Key.openTrayOnDrag)
         trayRetentionDays = defaults.integer(forKey: Key.trayRetentionDays)
         // The tray replaced the Home tab; hide Home once for anyone who had it on.
