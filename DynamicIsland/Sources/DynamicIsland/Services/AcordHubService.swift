@@ -173,13 +173,8 @@ final class AcordHubService {
         guard settings.showLiveActivity, lastUpdated != nil else { return nil }
         let now = self.now
         let lead = TimeInterval(settings.liveLeadMinutes * 60)
-        if let ongoing = events.first(where: { $0.isOngoing(now: now) }) {
-            return HubLiveItem(kind: .ongoingEvent, title: ongoing.title, date: ongoing.end)
-        }
-        if let next = events.filter({ !$0.isAllDay && $0.start > now && $0.start.timeIntervalSince(now) <= lead })
-            .min(by: { $0.start < $1.start }) {
-            return HubLiveItem(kind: .event, title: next.title, date: next.start)
-        }
+        // Calendar events don't sit beside the notch: the day is usually full, so it would never
+        // show anything else. They get a short alert before they start instead.
         if let post = posts.filter({ $0.status == "SCHEDULED" && ($0.date.map { $0 > now && $0.timeIntervalSince(now) <= lead } ?? false) })
             .min(by: { ($0.date ?? now) < ($1.date ?? now) }) {
             return HubLiveItem(kind: .post, title: post.title, date: post.date)

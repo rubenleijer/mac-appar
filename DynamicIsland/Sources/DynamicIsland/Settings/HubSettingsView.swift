@@ -232,7 +232,7 @@ struct HubSettingsView: View {
             } header: {
                 Text("Live-aktivitet")
             } footer: {
-                Text("Kommande och pågående möten och schemalagda inlägg, med nedräkning, medan ön är stängd.")
+                Text("Schemalagda inlägg och en pågående timer bredvid notchen medan ön är stängd. Möten visas inte där – de får en kort avisering innan de börjar.")
                     .foregroundStyle(.secondary)
             }
 
